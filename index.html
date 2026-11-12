@@ -1,0 +1,1484 @@
+<title>Paddle Draft</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: an auction room on one device. A lot card sits centre stage, the
+   bidder paddles sit beneath it, and each player's five-slot board sits below. */
+:root {
+  --bg: #e9edf3;
+  --surface: #ffffff;
+  --surface-2: #f4f6fa;
+  --ink: #15203a;
+  --muted: #5b6680;
+  --line: #d5dbe6;
+  --accent: #e2522b;      /* the bidding paddle */
+  --accent-ink: #ffffff;
+  --gold: #b97c0c;        /* the hammer price */
+  --good: #1f8a5b;
+  --shadow: 0 1px 2px rgba(21,32,58,.06), 0 8px 24px rgba(21,32,58,.08);
+  --p1: #e2522b; --p2: #2a6fdb; --p3: #1f8a5b; --p4: #8a4fd1; --p5: #c4398b; --p6: #b97c0c;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "DM Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1424; --surface: #172036; --surface-2: #1d2842; --ink: #e8ecf5; --muted: #98a3bd;
+    --line: #2a3654; --accent: #ff6a42; --accent-ink: #1a0d08; --gold: #f2b84b; --good: #3cc489;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    --p1: #ff6a42; --p2: #5d97ff; --p3: #3cc489; --p4: #b388ff; --p5: #f06bb4; --p6: #f2b84b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1424; --surface: #172036; --surface-2: #1d2842; --ink: #e8ecf5; --muted: #98a3bd;
+  --line: #2a3654; --accent: #ff6a42; --accent-ink: #1a0d08; --gold: #f2b84b; --good: #3cc489;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  --p1: #ff6a42; --p2: #5d97ff; --p3: #3cc489; --p4: #b388ff; --p5: #f06bb4; --p6: #f2b84b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.paddle-mark { width: 34px; height: 44px; position: relative; flex: none; }
+.paddle-mark::before { content: ""; position: absolute; inset: 0 0 14px; background: var(--accent); border-radius: 50% 50% 46% 46%; }
+.paddle-mark::after { content: ""; position: absolute; left: 14px; width: 6px; bottom: 0; height: 18px; background: var(--ink); border-radius: 3px; }
+.brand h1 { font-size: 26px; font-weight: 800; }
+.brand p { margin: 0; color: var(--muted); font-size: 13px; }
+.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+.ghost:hover { background: var(--surface); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: var(--shadow); }
+
+/* ---------- setup ---------- */
+.setup { display: grid; gap: 22px; }
+.setup h2 { font-size: 22px; }
+.field-row { display: grid; gap: 10px; }
+.players-list { display: grid; gap: 8px; }
+.player-input { display: flex; gap: 8px; align-items: center; }
+.player-input .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+input[type=text], input[type=number], textarea {
+  font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px; width: 100%; min-width: 0;
+}
+textarea { min-height: 140px; resize: vertical; }
+.icon-btn { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; width: 36px; height: 36px; flex: none; font-size: 18px; line-height: 1; }
+.add-btn { justify-self: start; background: transparent; border: 1px dashed var(--line); color: var(--ink); border-radius: 10px; padding: 8px 14px; }
+.genres { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.genre {
+  text-align: left; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--ink);
+  border-radius: 14px; padding: 14px; display: grid; gap: 4px; transition: border-color .15s, transform .15s;
+}
+.genre:hover { border-color: var(--muted); }
+.genre[aria-pressed="true"] { border-color: var(--accent); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent); }
+.genre strong { font-family: var(--f-display); font-size: 16px; font-weight: 700; }
+.genre span { font-size: 12.5px; color: var(--muted); }
+.rules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.rule { display: grid; gap: 6px; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.check input { margin-top: 3px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+.primary {
+  background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 14px;
+  padding: 14px 22px; font-family: var(--f-display); font-weight: 700; font-size: 17px;
+}
+.primary:disabled { opacity: .45; cursor: not-allowed; }
+.primary:not(:disabled):hover { filter: brightness(1.05); }
+.error { color: var(--accent); font-size: 13.5px; min-height: 1em; margin: 0; }
+.howto { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; display: grid; gap: 4px; max-width: 70ch; }
+
+/* ---------- auction stage ---------- */
+.stage { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .stage { grid-template-columns: 1fr; } }
+.lot { position: relative; overflow: hidden; display: grid; gap: 18px; }
+.lot-top { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.lot-title { font-size: clamp(28px, 5vw, 44px); font-weight: 800; line-height: 1.05; min-height: 1.1em; overflow-wrap: anywhere; }
+.lot-sub { color: var(--muted); margin-top: 6px; font-size: 15px; }
+.lot-title.spinning { color: var(--muted); }
+.price-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 16px; }
+.price { font-family: var(--f-mono); font-size: 54px; font-weight: 700; line-height: 1; color: var(--gold); font-variant-numeric: tabular-nums; }
+.price.bump { animation: bump .35s ease; }
+@keyframes bump { 40% { transform: scale(1.12); } }
+.leader { text-align: right; }
+.leader b { font-family: var(--f-display); font-size: 20px; }
+.stamp {
+  position: absolute; top: 16px; right: 18px; transform: rotate(8deg);
+  border: 3px solid var(--good); color: var(--good); font-family: var(--f-display); font-weight: 800;
+  padding: 4px 14px; border-radius: 8px; font-size: 22px; letter-spacing: .06em; background: var(--surface);
+  animation: stamp .4s cubic-bezier(.2,1.6,.4,1);
+}
+.stamp.unsold { border-color: var(--muted); color: var(--muted); }
+@keyframes stamp { from { transform: rotate(8deg) scale(2.2); opacity: 0; } }
+
+.turn { display: grid; gap: 14px; }
+.turn-who { display: flex; align-items: center; gap: 12px; }
+.turn-who .paddle { width: 46px; height: 58px; position: relative; flex: none; }
+.paddle::before { content: ""; position: absolute; inset: 0 0 18px; background: var(--pc); border-radius: 50% 50% 46% 46%; }
+.paddle::after { content: ""; position: absolute; left: 20px; width: 6px; bottom: 0; height: 22px; background: var(--ink); border-radius: 3px; }
+.paddle span { position: absolute; inset: 0 0 18px; display: grid; place-items: center; color: #fff; font-family: var(--f-display); font-weight: 800; font-size: 16px; z-index: 1; }
+.turn-who h2 { font-size: 24px; }
+.turn-who p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.bid-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bid-btn {
+  border: 0; border-radius: 12px; padding: 14px 8px; background: var(--pc, var(--accent)); color: #fff;
+  font-family: var(--f-mono); font-weight: 700; font-size: 18px; display: grid; gap: 2px;
+}
+.bid-btn small { font-family: var(--f-body); font-weight: 500; font-size: 11.5px; opacity: .9; }
+.bid-btn:disabled { opacity: .3; cursor: not-allowed; }
+.custom-bid { display: flex; gap: 8px; }
+.custom-bid input { flex: 1; }
+.custom-bid button { border: 1.5px solid var(--pc, var(--accent)); color: var(--ink); background: transparent; border-radius: 10px; padding: 0 16px; font-weight: 700; }
+.drop-btn { border: 1.5px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 12px; padding: 12px; font-weight: 700; }
+.drop-btn:hover { border-color: var(--muted); }
+.in-room { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); font-size: 13px; }
+.chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); }
+.chip.out { opacity: .45; text-decoration: line-through; }
+.chip.lead { border-color: var(--pc); box-shadow: inset 0 0 0 1px var(--pc); font-weight: 700; }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.log { display: grid; gap: 4px; font-size: 13px; color: var(--muted); max-height: 140px; overflow: auto; margin: 0; padding: 0; list-style: none; }
+.log li b { color: var(--ink); font-weight: 600; }
+
+/* ---------- boards ---------- */
+.boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.board { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 12px; border-top: 4px solid var(--pc); }
+.board-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.board-head h3 { font-size: 18px; overflow-wrap: anywhere; }
+.wallet { font-family: var(--f-mono); font-weight: 700; font-size: 18px; color: var(--gold); white-space: nowrap; }
+.slots { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: slot; }
+.slot { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); font-size: 14px; min-height: 40px; }
+.slot::before { counter-increment: slot; content: counter(slot); font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.slot.empty { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+.slot .t { overflow-wrap: anywhere; font-weight: 500; }
+.slot .p { display: block; font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-weight: 400; }
+.slot .v { font-family: var(--f-mono); font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+.board-total { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.board-total b { font-size: 22px; color: var(--pc); }
+.board.champ { box-shadow: 0 0 0 2px var(--pc), var(--shadow); }
+.crown { display: inline-block; vertical-align: middle; font-family: var(--f-body); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 2px 8px; border-radius: 999px; background: var(--pc); color: #fff; }
+.genre .wins { color: var(--ink); font-weight: 500; }
+.lot-stat { margin-top: 10px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.lot-stat b { font-size: 15px; }
+.vote-btn { border: 0; border-radius: 12px; padding: 12px 20px; background: var(--pc); color: #fff; font-family: var(--f-display); font-weight: 700; font-size: 16px; }
+.slot.new { animation: flash 1.2s ease; }
+@keyframes flash { 0% { background: var(--pc); color: #fff; } }
+.board-foot { font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+
+.queue-strip { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.qdot { width: 22px; height: 8px; border-radius: 4px; background: var(--line); }
+.qdot.done { background: var(--muted); opacity: .5; }
+.qdot.now { background: var(--accent); }
+
+/* ---------- results ---------- */
+.results-head { display: grid; gap: 6px; }
+.results-head h2 { font-size: clamp(26px, 4vw, 36px); }
+.awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.award { background: var(--surface-2); border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; }
+.award b { font-family: var(--f-display); font-size: 16px; }
+.award span { font-size: 13px; color: var(--muted); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+
+/* ---------- home, lobby, online ---------- */
+.home { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.mode-card { display: grid; gap: 10px; align-content: start; }
+.mode-card h2 { font-size: 22px; }
+.mode-card .primary { justify-self: start; }
+.join-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; }
+.code-input { font-family: var(--f-mono) !important; font-weight: 700; font-size: 20px !important; letter-spacing: .2em; text-transform: uppercase; text-align: center; }
+.lobby { display: grid; gap: 16px; }
+.lobby h2 { font-size: 22px; }
+.lobby-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.room-code { font-size: clamp(48px, 14vw, 84px); font-weight: 700; letter-spacing: .14em; line-height: 1; color: var(--accent); }
+.lobby-genre { font-family: var(--f-display); font-size: 18px; }
+.room-bar { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.room-bar b { font-size: 16px; letter-spacing: .1em; }
+.you { display: inline-block; vertical-align: middle; font-family: var(--f-body); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--pc); color: var(--ink); }
+.waiting { display: flex; gap: 6px; padding: 8px 0; }
+.waiting span { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); animation: pulse 1.2s ease-in-out infinite; }
+.waiting span:nth-child(2) { animation-delay: .2s; } .waiting span:nth-child(3) { animation-delay: .4s; }
+@keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+.source { margin: 0; font-size: 12.5px; color: var(--muted); }
+.lan-rooms { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.lan-room { display: flex; align-items: baseline; gap: 12px; text-align: left; border: 1.5px solid var(--accent); background: var(--surface-2); color: var(--ink); border-radius: 12px; padding: 10px 14px; }
+.lan-room b { font-size: 18px; letter-spacing: .12em; color: var(--accent); }
+.lan-room span { font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
+.lan-hint { text-align: center; }
+[hidden] { display: none !important; }
+.pair-wrap { position: fixed; inset: 0; background: rgba(10, 14, 26, .55); z-index: 30; display: grid; place-items: center; overflow-y: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)); }
+.pair-sheet { width: 100%; max-width: 440px; display: grid; gap: 14px; }
+.pair-sheet h2 { font-size: 22px; }
+.pair-head { display: flex; justify-content: space-between; align-items: center; }
+.pair-step { display: flex; gap: 12px; align-items: flex-start; }
+.pair-step p { margin: 0; }
+.step { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.qr { background: #fff; border-radius: 12px; padding: 8px; width: min(100%, 320px); justify-self: center; }
+.qr svg { display: block; width: 100%; height: auto; }
+.cam { width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; background: #000; }
+.manual summary { cursor: pointer; color: var(--muted); font-size: 13.5px; }
+.manual { display: grid; gap: 8px; }
+.manual-row { display: flex; gap: 8px; margin-top: 8px; }
+.manual-row input { flex: 1; font-family: var(--f-mono); font-size: 12px; }
+.conn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.conn.ok::before { background: var(--good); }
+.conn.off::before { background: var(--accent); }
+.pair-btn.ghost { padding: 6px 10px; }
+.join-row.solo { grid-template-columns: 1fr; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); max-width: min(520px, calc(100% - 32px)); background: var(--ink); color: var(--bg); padding: 12px 16px; border-radius: 12px; font-size: 14px; box-shadow: var(--shadow); z-index: 20; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="paddle-mark" aria-hidden="true"></div>
+      <div>
+        <h1>Paddle Draft</h1>
+        <p>Pick a genre. Bid for the top 10. Fill five slots.</p>
+      </div>
+    </div>
+    <button class="ghost" id="restartBtn" hidden>New game</button>
+  </header>
+  <main id="app"></main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="pair-wrap" id="pair" hidden></div>
+
+<script>
+/* ---------------- genre data ---------------- */
+/* Each genre has one stat that decides the winner: highest combined total wins.
+   Figures checked against public sources in November 2026. */
+const GENRES = [
+  { id: "films-2020s", name: "Movies of the 2020s", blurb: "Blockbusters and awards darlings",
+    stat: { label: "Worldwide box office", fmt: "usdm", source: "Box Office Mojo lifetime grosses, Nov 2026" }, items: [
+    ["Oppenheimer","2023",976],["Dune: Part Two","2024",715],["Everything Everywhere All at Once","2022",143],
+    ["Top Gun: Maverick","2022",1496],["Spider-Man: No Way Home","2021",1921],["Barbie","2023",1447],
+    ["Past Lives","2023",43],["The Batman","2022",773],["Inside Out 2","2024",1699],["Poor Things","2023",118] ]},
+  { id: "films-2010s", name: "Movies of the 2010s", blurb: "The decade of Marvel and Parasite",
+    stat: { label: "Worldwide box office", fmt: "usdm", source: "Box Office Mojo lifetime grosses, Nov 2026" }, items: [
+    ["Parasite","2019",263],["Mad Max: Fury Road","2015",380],["The Social Network","2010",225],["Get Out","2017",256],
+    ["Inception","2010",840],["Interstellar","2014",774],["Avengers: Endgame","2019",2799],["Whiplash","2014",50],
+    ["La La Land","2016",509],["Moonlight","2016",67] ]},
+  { id: "films-2000s", name: "Movies of the 2000s", blurb: "From Gladiator to Basterds",
+    stat: { label: "Worldwide box office", fmt: "usdm", source: "Box Office Mojo lifetime grosses, Nov 2026" }, items: [
+    ["The Dark Knight","2008",1008],["The Return of the King","2003",1149],["Spirited Away","2001",359],["Gladiator","2000",465],
+    ["No Country for Old Men","2007",172],["There Will Be Blood","2007",76],["The Departed","2006",291],
+    ["Finding Nemo","2003",942],["Inglourious Basterds","2009",321],["City of God","2002",31] ]},
+  { id: "tv", name: "TV shows", blurb: "Prestige drama and great comedy",
+    stat: { label: "IMDb rating", fmt: "rating", source: "IMDb user ratings, approximate" }, items: [
+    ["Breaking Bad","2008–2013",9.5],["The Sopranos","1999–2007",9.2],["The Wire","2002–2008",9.3],
+    ["Game of Thrones","2011–2019",9.2],["Succession","2018–2023",8.8],["Fleabag","2016–2019",8.7],
+    ["Better Call Saul","2015–2022",9.0],["The Bear","2022–",8.5],["Stranger Things","2016–2025",8.6],["The Office (US)","2005–2013",9.0] ]},
+  { id: "albums-2010s", name: "Albums of the 2010s", blurb: "Records that defined the decade",
+    stat: { label: "Metacritic critics' score", fmt: "int", source: "Metacritic Metascores" }, items: [
+    ["To Pimp a Butterfly","Kendrick Lamar · 2015",96],["Blonde","Frank Ocean · 2016",87],["Lemonade","Beyoncé · 2016",92],
+    ["My Beautiful Dark Twisted Fantasy","Kanye West · 2010",94],["21","Adele · 2011",76],
+    ["good kid, m.A.A.d city","Kendrick Lamar · 2012",91],["channel ORANGE","Frank Ocean · 2012",91],
+    ["AM","Arctic Monkeys · 2013",81],["Random Access Memories","Daft Punk · 2013",87],["Currents","Tame Impala · 2015",84] ]},
+  { id: "songs-2000s", name: "Pop songs of the 2000s", blurb: "Indie discos and R&B anthems",
+    stat: { label: "Spotify streams", fmt: "streams", source: "Spotify totals via kworb.net, Nov 2026" }, items: [
+    ["Crazy in Love","Beyoncé · 2003",2.02],["Hey Ya!","OutKast · 2003",2.02],["Umbrella","Rihanna · 2007",2.48],
+    ["Mr. Brightside","The Killers · 2004",3.59],["Toxic","Britney Spears · 2004",2.11],["Seven Nation Army","The White Stripes · 2003",2.33],
+    ["Rehab","Amy Winehouse · 2006",0.74],["Single Ladies","Beyoncé · 2008",0.91],["In da Club","50 Cent · 2003",2.28],
+    ["Since U Been Gone","Kelly Clarkson · 2004",1.21] ]},
+  { id: "games-2010s", name: "Video games of the 2010s", blurb: "Open worlds and tight shooters",
+    stat: { label: "Copies sold", fmt: "millions", source: "Latest publisher figures; some are a few years old" }, items: [
+    ["Red Dead Redemption 2","2018",87],["The Witcher 3","2015",65],["Breath of the Wild","2017",36],["Skyrim","2011",65],
+    ["Minecraft","2011",425],["Grand Theft Auto V","2013",215],["Mario Kart 8 Deluxe","2017",72],["Portal 2","2011",4],
+    ["God of War","2018",23],["Super Smash Bros. Ultimate","2018",38] ]},
+  { id: "pl-legends", name: "Premier League legends", blurb: "The best of the PL era",
+    stat: { label: "Premier League goals", fmt: "int", source: "PL career goals to the end of 2025-26" }, items: [
+    ["Thierry Henry","Arsenal",175],["Alan Shearer","Blackburn · Newcastle",260],["Cristiano Ronaldo","Man United",103],
+    ["Wayne Rooney","Everton · Man United",208],["Steven Gerrard","Liverpool",120],["Frank Lampard","West Ham · Chelsea",177],
+    ["Kevin De Bruyne","Man City",72],["Mohamed Salah","Chelsea · Liverpool",193],["Didier Drogba","Chelsea",104],["Ryan Giggs","Man United",109] ]},
+  { id: "fast-food", name: "Fast food chains", blurb: "The great British takeaway",
+    stat: { label: "UK restaurants", fmt: "int", source: "UK store counts, Nov 2026" }, items: [
+    ["McDonald's","Burgers",1530],["KFC","Fried chicken",1010],["Nando's","Peri-peri",490],["Greggs","Bakery",2820],
+    ["Five Guys","Burgers",180],["Domino's","Pizza",1330],["Burger King","Burgers",560],["Subway","Subs",2080],
+    ["Wingstop","Wings",110],["Taco Bell","Tex-Mex",150] ]},
+  { id: "custom", name: "Make your own", blurb: "Type in any list you like", stat: null, items: [] },
+];
+function fmtStat(v, fmt) {
+  if (v == null || isNaN(v)) return "–";
+  switch (fmt) {
+    case "usdm": return v >= 1000 ? "$" + (v / 1000).toFixed(2).replace(/0$/, "") + "bn" : "$" + Math.round(v) + "m";
+    case "rating": return (+v).toFixed(1);
+    case "streams": return (+v).toFixed(2) + "bn";
+    case "millions": return Math.round(v) + "m";
+    default: return Math.round(v).toLocaleString("en-GB");
+  }
+}
+const PCOLORS = ["--p1","--p2","--p3","--p4","--p5","--p6"];
+
+/* ---------------- state ---------------- */
+// Local games keep their state in this browser. Online games keep it in one
+// shared document, rooms/<CODE>, which every player's phone listens to.
+const STORE_KEY = "paddle-draft-v1", ROOM_KEY = "paddle-draft-room", DEVICE_KEY = "paddle-draft-device";
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }
+const ME = lsGet(DEVICE_KEY) || ("d" + Math.random().toString(36).slice(2, 12));
+lsSet(DEVICE_KEY, ME);
+
+let S = null;     // the game: local state, or the room's state when online
+let NET = null;   // { code, ref, unsub, loadTimer, slow } while in an online room
+// LOCAL: the page was opened from the home server in the zip (plain http on
+// the home Wi-Fi). Rooms then live on that server instead of in Claude.
+const LOCAL = location.protocol === "http:";
+let dbPromise = null;
+function getDb() {
+  if (!dbPromise) dbPromise = LOCAL ? Promise.resolve(makeLocalDb()) : P2P ? Promise.resolve(makeP2pDb())
+    : (window.claude && window.claude.use) ? window.claude.use("db").catch(() => null) : Promise.resolve(null);
+  return dbPromise;
+}
+function makeLocalDb() {
+  const url = code => "/api/room/" + code;
+  const snap = (code, r) => ({ id: code, exists: !!r.exists, data: () => r.exists ? JSON.parse(JSON.stringify(r.doc)) : undefined,
+    metadata: { fromCache: false, hasPendingWrites: false } });
+  const fail = () => { throw { code: "unavailable" }; };
+  async function fetchRoom(code) {
+    const res = await fetch(url(code), { cache: "no-store" }).catch(fail);
+    if (!res.ok) fail();
+    return res.json();
+  }
+  return { doc(path) {
+    const code = path.split("/")[1];
+    return {
+      path,
+      get: async () => snap(code, await fetchRoom(code)),
+      set: async d => {
+        const res = await fetch(url(code), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) }).catch(fail);
+        if (!res.ok) fail();
+      },
+      delete: async () => { await fetch(url(code) + "?delete=1", { method: "POST", body: "{}" }).catch(fail); },
+      acquire: async () => ({ acquired: true }),
+      onSnapshot(next) {
+        let stop = false, last = -1;
+        const tick = async () => {
+          if (stop) return;
+          try { const r = await fetchRoom(code); if (!stop && r.version !== last) { last = r.version; next(snap(code, r)); } } catch (e) { /* keep polling */ }
+          if (!stop) setTimeout(tick, 600);
+        };
+        tick();
+        return () => { stop = true; };
+      },
+    };
+  } };
+}
+let lanInfo = null, lanRooms = [], lanPoll = null;
+async function pollLan() {
+  if (!LOCAL) return;
+  try {
+    if (!lanInfo) lanInfo = await (await fetch("/api/info", { cache: "no-store" })).json();
+    const rooms = await (await fetch("/api/rooms", { cache: "no-store" })).json();
+    const next = rooms.filter(r => r.doc && r.doc.state && r.doc.state.phase === "lobby")
+      .map(r => ({ code: r.code, names: r.doc.state.members.map(m => m.name), genre: r.doc.state.setup.genreId }));
+    const changed = JSON.stringify(next) !== JSON.stringify(lanRooms);
+    lanRooms = next;
+    if (changed && S && S.phase === "home") render();
+  } catch (e) { }
+}
+const lanAddress = () => lanInfo && lanInfo.addresses && lanInfo.addresses.length ? `http://${lanInfo.addresses[0]}:${lanInfo.port}` : null;
+/* ---------------- phone-to-phone (P2P) ---------------- */
+// On the GitHub-hosted copy there is no Claude and no server. The host's
+// phone and each guest's phone pair by scanning QR codes, then talk directly
+// over the home Wi-Fi with WebRTC. Each phone keeps a copy of the room and
+// they swap the newest copy whenever something changes.
+const P2P = !LOCAL && !(window.claude && window.claude.use);
+const PN = { code: null, ver: 0, doc: null, listeners: [], peers: [], isHost: false };
+const mirrorKey = code => "paddle-p2p-" + code;
+function loadMirror(code) { try { return JSON.parse(lsGet(mirrorKey(code)) || "null"); } catch (e) { return null; } }
+function useRoom(code) {
+  if (PN.code === code) return;
+  PN.code = code;
+  const m = loadMirror(code);
+  PN.ver = m ? m.ver : 0; PN.doc = m ? m.doc : null;
+}
+function p2pNotify() {
+  for (const l of PN.listeners) if (l.code === PN.code) l.next(p2pSnap());
+}
+function p2pSnap() {
+  const d = PN.doc;
+  return { id: PN.code, exists: !!d, data: () => d ? JSON.parse(JSON.stringify(d)) : undefined, metadata: { fromCache: false, hasPendingWrites: false } };
+}
+function p2pStore(doc, ver) {
+  PN.doc = doc; PN.ver = ver;
+  lsSet(mirrorKey(PN.code), doc ? JSON.stringify({ ver, doc }) : null);
+}
+function p2pBroadcast(msg, except) {
+  const s = JSON.stringify(msg);
+  for (const p of PN.peers) if (p !== except && p.dc && p.dc.readyState === "open") { try { p.dc.send(s); } catch (e) { } }
+}
+function p2pReceive(peer, raw) {
+  let msg; try { msg = JSON.parse(raw); } catch (e) { return; }
+  if (msg.t !== "doc" || !msg.code) return;
+  if (!PN.code) useRoom(msg.code);
+  if (msg.code !== PN.code) return;
+  // Newest copy wins. On a tie the host's copy wins.
+  const newer = msg.v > PN.ver || (msg.v === PN.ver && !PN.isHost && JSON.stringify(msg.d) !== JSON.stringify(PN.doc));
+  if (!newer) return;
+  p2pStore(msg.d, msg.v);
+  if (PN.isHost) p2pBroadcast(msg, peer);
+  p2pNotify();
+  if (pairing && pairing.onDoc) pairing.onDoc();
+}
+function makeP2pDb() {
+  return { doc(path) {
+    const code = path.split("/")[1];
+    return {
+      path,
+      get: async () => { useRoom(code); return p2pSnap(); },
+      set: async d => { useRoom(code); p2pStore(JSON.parse(JSON.stringify(d)), PN.ver + 1); p2pBroadcast({ t: "doc", code, v: PN.ver, d: PN.doc }); p2pNotify(); },
+      delete: async () => { useRoom(code); p2pStore(null, PN.ver + 1); },
+      acquire: async () => ({ acquired: true }),
+      onSnapshot(next) {
+        useRoom(code);
+        const l = { code, next };
+        PN.listeners.push(l);
+        setTimeout(() => next(p2pSnap()), 0);
+        return () => { PN.listeners = PN.listeners.filter(x => x !== l); };
+      },
+    };
+  } };
+}
+const connectedPeers = () => PN.peers.filter(p => p.dc && p.dc.readyState === "open");
+function closePeers() { for (const p of PN.peers) { try { p.pc.close(); } catch (e) { } } PN.peers = []; }
+
+// --- pairing codes: compressed SDP, base64url ---
+async function packSignal(obj) {
+  const text = JSON.stringify(obj);
+  if (window.CompressionStream) {
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
+    return "Z" + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  return "J" + btoa(unescape(encodeURIComponent(text))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function unpackSignal(s) {
+  s = (s || "").trim();
+  const kind = s[0], b64 = s.slice(1).replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+  if (kind === "J") return JSON.parse(decodeURIComponent(escape(bin)));
+  if (kind !== "Z" || !window.DecompressionStream) throw new Error("bad code");
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return JSON.parse(await new Response(stream).text());
+}
+function iceDone(pc) {
+  return new Promise(res => {
+    if (pc.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 2500);
+    pc.addEventListener("icegatheringstatechange", () => { if (pc.iceGatheringState === "complete") { clearTimeout(t); res(); } });
+  });
+}
+function wirePeer(peer) {
+  const dc = peer.dc;
+  dc.onmessage = e => p2pReceive(peer, e.data);
+  const opened = () => {
+    // Swap copies straight away; whichever is newer wins on both sides.
+    if (PN.code && PN.doc) try { dc.send(JSON.stringify({ t: "doc", code: PN.code, v: PN.ver, d: PN.doc })); } catch (e) { }
+    keepAwake();
+    if (pairing && pairing.peer === peer && pairing.onOpen) pairing.onOpen();
+    render();
+  };
+  if (dc.readyState === "open") setTimeout(opened, 0); else dc.onopen = opened;
+  dc.onclose = () => { render(); };
+  peer.pc.onconnectionstatechange = () => { if (["failed", "closed", "disconnected"].includes(peer.pc.connectionState)) render(); };
+}
+
+let wakeLock = null;
+async function keepAwake() {
+  try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); } } catch (e) { }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && connectedPeers().length) keepAwake(); });
+
+// --- libraries, loaded only on the phone-to-phone copy ---
+const libs = {};
+function loadScript(src) {
+  if (!libs[src]) libs[src] = new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+  return libs[src];
+}
+function qrSvg(text) {
+  const qr = qrcode(0, "L");
+  qr.addData(text, "Byte");
+  qr.make();
+  return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+}
+
+// --- the pairing sheet ---
+let pairing = null;
+const $pair = document.getElementById("pair");
+function closePairing() {
+  if (pairing) { pairing.closed = true; if (pairing.stream) pairing.stream.getTracks().forEach(t => t.stop()); clearInterval(pairing.scanTimer); }
+  pairing = null; $pair.hidden = true; $pair.innerHTML = "";
+}
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    pairing.stream = stream;
+    return true;
+  } catch (e) { return false; }
+}
+function attachScanner(onCode) {
+  const video = document.getElementById("pairVideo");
+  if (!video || !pairing.stream) return;
+  video.srcObject = pairing.stream;
+  video.setAttribute("playsinline", ""); video.muted = true;
+  video.play().catch(() => { });
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  clearInterval(pairing.scanTimer);
+  pairing.scanTimer = setInterval(() => {
+    if (!video.videoWidth || !window.jsQR) return;
+    const w = Math.min(720, video.videoWidth), h = Math.round(video.videoHeight * w / video.videoWidth);
+    canvas.width = w; canvas.height = h;
+    ctx.drawImage(video, 0, 0, w, h);
+    const found = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
+    if (found && found.data) { clearInterval(pairing.scanTimer); onCode(found.data); }
+  }, 250);
+}
+function pairShell(inner) {
+  $pair.hidden = false;
+  $pair.innerHTML = `<div class="pair-sheet panel" role="dialog" aria-modal="true" aria-label="Pair a phone">
+    <div class="pair-head"><span class="label">Pair phones</span><button class="ghost" id="pairClose">Close</button></div>
+    ${inner}
+  </div>`;
+  document.getElementById("pairClose").onclick = closePairing;
+}
+function codeTools(code) {
+  return `<details class="manual"><summary>Camera not working?</summary>
+    <p class="note">Send this code to the other phone (for example in Messages), and paste theirs below.</p>
+    <div class="manual-row"><input type="text" id="myCode" readonly value="${esc(code || "")}" aria-label="Your pairing code"><button class="ghost" id="copyMine">Copy</button></div>
+    <div class="manual-row"><input type="text" id="theirCode" placeholder="Paste their code" aria-label="Their pairing code"><button class="ghost" id="useTheirs">Use</button></div>
+  </details>`;
+}
+function wireCodeTools(onCode) {
+  const mine = document.getElementById("copyMine");
+  if (mine) mine.onclick = async () => { const v = document.getElementById("myCode").value; try { await navigator.clipboard.writeText(v); toast("Code copied."); } catch (e) { document.getElementById("myCode").select(); } };
+  const use = document.getElementById("useTheirs");
+  if (use) use.onclick = () => { const v = document.getElementById("theirCode").value.trim(); if (v) onCode(v); };
+}
+
+// Host: show an invite code, then scan the guest's reply.
+async function hostPair() {
+  closePairing();
+  pairing = { role: "host" };
+  pairShell(`<h2>Getting ready…</h2><p class="note">Allow the camera so you can scan the other phone's reply.</p>`);
+  await loadScript("vendor/qrcode.js"); loadScript("vendor/jsQR.js");
+  const camOk = await startCamera();
+  if (!pairing || pairing.closed) return;
+  const pc = new RTCPeerConnection({ iceServers: [] });
+  const peer = { pc, dc: pc.createDataChannel("game") };
+  pairing.peer = peer;
+  PN.isHost = true;
+  wirePeer(peer);
+  await pc.setLocalDescription(await pc.createOffer());
+  await iceDone(pc);
+  if (!pairing || pairing.closed) { pc.close(); return; }
+  const invite = await packSignal({ k: "o", c: S.code, s: pc.localDescription.sdp });
+  pairing.onOpen = () => { PN.peers.push(peer); closePairing(); toast("Phone connected."); };
+  const accept = async code => {
+    try {
+      const sig = await unpackSignal(code);
+      if (sig.k !== "a") throw new Error("not a reply");
+      await pc.setRemoteDescription({ type: "answer", sdp: sig.s });
+      pairShell(`<h2>Connecting…</h2><p class="note">Keep both phones on the same Wi-Fi.</p>`);
+      setTimeout(() => { if (pairing && pairing.peer === peer && peer.dc.readyState !== "open") failPairing(); }, 15000);
+    } catch (e) { toast("That isn't a reply code from this game. Try scanning again."); attachScanner(accept); }
+  };
+  pairShell(`
+    <div class="pair-step"><span class="step">1</span><p>On the other phone, open the game, tap <b>Join a room</b>, and point its camera at this code.</p></div>
+    <div class="qr">${qrSvg(invite)}</div>
+    <div class="pair-step"><span class="step">2</span><p>Their phone then shows a code. Point ${camOk ? "this camera" : "your camera"} at it.</p></div>
+    ${camOk ? `<video id="pairVideo" class="cam" aria-label="Camera preview"></video>` : `<p class="error">The camera is blocked. Use "Camera not working?" below instead.</p>`}
+    ${codeTools(invite)}`);
+  wireCodeTools(accept);
+  if (camOk) attachScanner(accept);
+}
+
+// Guest: scan the host's invite, then show a reply code.
+async function guestPair(name) {
+  closePairing();
+  pairing = { role: "guest", name };
+  pairShell(`<h2>Getting ready…</h2><p class="note">Allow the camera to scan the host's code.</p>`);
+  await loadScript("vendor/jsQR.js"); loadScript("vendor/qrcode.js");
+  const camOk = await startCamera();
+  if (!pairing || pairing.closed) return;
+  const accept = async code => {
+    let sig;
+    try { sig = await unpackSignal(code); if (sig.k !== "o") throw new Error(); }
+    catch (e) { toast("That isn't an invite code from this game. Try again."); if (camOk) attachScanner(accept); return; }
+    await loadScript("vendor/qrcode.js");
+    const pc = new RTCPeerConnection({ iceServers: [] });
+    const peer = { pc, dc: null };
+    pairing.peer = peer;
+    PN.isHost = false;
+    pc.ondatachannel = e => { peer.dc = e.channel; wirePeer(peer); };
+    useRoom(sig.c);
+    await pc.setRemoteDescription({ type: "offer", sdp: sig.s });
+    await pc.setLocalDescription(await pc.createAnswer());
+    await iceDone(pc);
+    if (!pairing || pairing.closed) { pc.close(); return; }
+    const reply = await packSignal({ k: "a", s: pc.localDescription.sdp });
+    if (pairing.stream) { pairing.stream.getTracks().forEach(t => t.stop()); pairing.stream = null; }
+    pairing.onOpen = () => { PN.peers = [peer]; pairShell(`<h2>Connected</h2><p class="note">Joining the room…</p>`); };
+    pairing.onDoc = async () => {
+      if (!pairing || pairing.joined) return;
+      pairing.joined = true;
+      const $err = document.createElement("p");
+      const code = sig.c;
+      closePairing();
+      if (NET && NET.code === code) return;
+      await joinRoom(code, name, $err);
+      if ($err.textContent) toast($err.textContent);
+    };
+    setTimeout(() => { if (pairing && pairing.peer === peer && (!peer.dc || peer.dc.readyState !== "open")) failPairing(); }, 45000);
+    pairShell(`
+      <div class="pair-step"><span class="step">2</span><p>Now point the host's camera at this code.</p></div>
+      <div class="qr">${qrSvg(reply)}</div>
+      ${codeTools(reply)}`);
+    wireCodeTools(() => { });
+  };
+  pairShell(`
+    <div class="pair-step"><span class="step">1</span><p>On the host's phone, tap <b>Pair a phone</b>. Point this camera at the code it shows.</p></div>
+    ${camOk ? `<video id="pairVideo" class="cam" aria-label="Camera preview"></video>` : `<p class="error">The camera is blocked. Use "Camera not working?" below instead.</p>`}
+    ${codeTools("")}`);
+  wireCodeTools(accept);
+  if (camOk) attachScanner(accept);
+}
+function failPairing() {
+  pairShell(`<h2>The phones couldn't connect</h2>
+    <p class="note">Check both phones are on the same Wi-Fi (not mobile data), then try pairing again. Guest or office Wi-Fi often blocks phones from talking to each other.</p>
+    <div class="actions"><button class="primary" id="pairRetry">Try again</button></div>`);
+  document.getElementById("pairRetry").onclick = () => (pairing && pairing.role === "guest") ? guestPair(pairing.name) : hostPair();
+}
+let dbAvailable = null; // null = still checking
+
+function defaultSetup() {
+  return { phase: "home", mode: "local", names: ["Player 1", "Player 2"], myName: "", genreId: "films-2020s", custom: "",
+    customName: "", customStat: "", budget: 20, slots: 5, reserve: true, secondChance: true, showStats: false };
+}
+function save() { if (NET) return; try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
+function load() { try { const r = localStorage.getItem(STORE_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+
+const $app = document.getElementById("app");
+const $restart = document.getElementById("restartBtn");
+const $toast = document.getElementById("toast");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const money = n => "£" + n;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const reduceMotion = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+let toastTimer;
+function toast(msg) { $toast.textContent = msg; $toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { $toast.hidden = true; }, 5000); }
+const mySeat = () => NET && S && S.players ? S.players.findIndex(p => p.id === ME) : -1;
+const isMember = () => NET && S && S.members ? S.members.some(m => m.id === ME) : false;
+
+/* ---------------- rules ---------------- */
+const empty = p => S.slots - p.picks.length;
+function maxBid(p) {
+  if (empty(p) <= 0) return 0;
+  return S.reserve ? p.budget - (empty(p) - 1) : p.budget;
+}
+function canStillBuy(p) { return empty(p) > 0 && maxBid(p) >= 1; }
+
+function startGame(setup) {
+  const g = GENRES.find(x => x.id === setup.genreId);
+  let items, genreName, stat;
+  if (g.id === "custom") {
+    items = setup.custom.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+      const parts = l.split(/\s+[-–|]\s+/);
+      const t = parts.shift();
+      let value = null;
+      if (parts.length && /^[\d.,]+$/.test(parts[parts.length - 1])) value = parseFloat(parts.pop().replace(/,/g, ""));
+      return { title: t, sub: parts.join(" · "), value };
+    });
+    genreName = (setup.customName || "").trim() || "Custom list";
+    stat = items.some(it => it.value != null) ? { label: (setup.customStat || "").trim() || "Score", fmt: "num" } : null;
+  } else {
+    items = g.items.map(([title, sub, value]) => ({ title, sub, value }));
+    genreName = g.name;
+    stat = g.stat;
+  }
+  const roster = NET ? S.members.map(m => ({ id: m.id, name: m.name })) : setup.names.map(n => ({ id: null, name: n }));
+  const keep = NET ? { code: S.code, host: S.host, members: S.members } : {};
+  S = {
+    ...keep,
+    phase: "reveal", setup, stat, showStats: setup.showStats,
+    genre: genreName, budget: setup.budget, slots: setup.slots, reserve: setup.reserve, secondChance: setup.secondChance,
+    players: roster.map((r, i) => ({ id: r.id, name: (r.name || "").trim() || `Player ${i + 1}`, color: PCOLORS[i], budget: setup.budget, picks: [] })),
+    queue: shuffle(items).map(it => ({ ...it, passes: 0 })),
+    pos: 0, opener: 0, lot: null, history: [], lastSold: null, vote: null,
+  };
+}
+
+function openLot() {
+  const item = S.queue[S.pos];
+  const eligible = S.players.map((p, i) => i).filter(i => canStillBuy(S.players[i]));
+  const first = firstOpener();
+  S.opener = (S.opener + 1) % S.players.length;
+  S.lot = { item, price: 0, leader: null, active: eligible, turn: eligible.includes(first) ? first : (eligible[0] ?? null), result: null, log: [] };
+  S.phase = "auction";
+  autoSkip();
+}
+
+function firstOpener() {
+  const n = S.players.length;
+  for (let k = 0; k < n; k++) { const i = (S.opener + k) % n; if (canStillBuy(S.players[i])) return i; }
+  return 0;
+}
+
+function nextTurn(from) {
+  const L = S.lot, n = S.players.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (from + k) % n;
+    if (L.active.includes(i) && i !== L.leader) return i;
+  }
+  return null;
+}
+
+// Players who cannot top the current price drop out automatically.
+function autoSkip() {
+  const L = S.lot;
+  let guard = 0;
+  while (L.turn !== null && guard++ < 20) {
+    const p = S.players[L.turn];
+    if (maxBid(p) > L.price) break;
+    L.active = L.active.filter(i => i !== L.turn);
+    L.log.unshift(`<b>${esc(p.name)}</b> can't go above ${money(L.price)} and drops out`);
+    L.turn = nextTurn(L.turn);
+  }
+  checkHammer();
+}
+
+function checkHammer() {
+  const L = S.lot;
+  const others = L.active.filter(i => i !== L.leader);
+  if (L.leader !== null && others.length === 0) return hammer(L.leader);
+  if (L.leader === null && L.active.length === 0) return hammer(null);
+}
+
+function bid(amount) {
+  const L = S.lot, p = S.players[L.turn];
+  if (!(amount > L.price) || amount > maxBid(p)) return false;
+  L.price = amount; L.leader = L.turn;
+  L.log.unshift(`<b>${esc(p.name)}</b> bids ${money(amount)}`);
+  L.turn = nextTurn(L.turn);
+  if (L.turn === null) checkHammer(); else autoSkip();
+}
+
+function drop() {
+  const L = S.lot, p = S.players[L.turn];
+  L.active = L.active.filter(i => i !== L.turn);
+  L.log.unshift(`<b>${esc(p.name)}</b> drops out`);
+  L.turn = nextTurn(L.turn);
+  if (L.turn === null) checkHammer(); else autoSkip();
+}
+
+function hammer(winner) {
+  const L = S.lot;
+  L.turn = null;
+  if (winner === null) {
+    L.result = { sold: false };
+    L.item.passes = (L.item.passes || 0) + 1;
+    if (S.secondChance && L.item.passes < 2) { S.queue.push({ ...L.item }); L.result.back = true; }
+  } else {
+    const p = S.players[winner];
+    p.budget -= L.price;
+    p.picks.push({ title: L.item.title, sub: L.item.sub, price: L.price, value: L.item.value });
+    L.result = { sold: true, winner, price: L.price };
+    S.lastSold = { player: winner, slot: p.picks.length - 1 };
+  }
+  S.history.push({ title: L.item.title, winner, price: winner === null ? 0 : L.price });
+  S.phase = "sold";
+}
+
+function nextLot() {
+  S.pos++;
+  S.lastSold = null;
+  if (S.pos >= S.queue.length || !S.players.some(canStillBuy)) { S.phase = "end"; S.lot = null; return; }
+  S.phase = "reveal";
+}
+
+/* ---------------- actions: local or online ---------------- */
+// fn mutates S and returns false to cancel. Online, it runs against the
+// room's latest state and the result is written back to the room.
+let busy = false;
+async function act(fn) {
+  if (!NET) { if (fn() !== false) { save(); render(); } return; }
+  if (busy) return;
+  busy = true;
+  const before = S;
+  try {
+    const snap = await NET.ref.get();
+    if (!snap.exists) { toast("This room no longer exists."); return; }
+    S = JSON.parse(JSON.stringify(snap.data().state));
+    if (fn() === false) { render(); return; }
+    render();
+    await NET.ref.set({ state: S, updatedAt: Date.now() });
+  } catch (e) {
+    S = before; render();
+    netError(e);
+  } finally { busy = false; }
+}
+
+function netError(e) {
+  const code = e && e.code;
+  if (code === "invalid_argument") toast("Your account can't save moves in this game. Ask the person who shared it to invite you as an Editor.");
+  else if (code === "quota_exceeded") toast("The game's storage is full. Start a new room later.");
+  else if (code === "revoked") toast("Your access to this game changed. Reload to continue.");
+  else toast("Couldn't reach the room. Check your connection and try again.");
+}
+
+/* ---------------- online rooms ---------------- */
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const genCode = () => Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
+
+async function createRoom(setup, $err) {
+  const db = await getDb();
+  if (!db) { $err.textContent = "Online rooms only work when this game is opened in Claude while signed in."; return; }
+  try {
+    let code, ref;
+    for (let i = 0; i < 6; i++) {
+      code = genCode(); ref = db.doc("rooms/" + code);
+      const snap = await ref.get();
+      const old = snap.exists && (Date.now() - (snap.data().updatedAt || 0) > 24 * 3600e3);
+      if (!snap.exists || old) break;
+      code = null;
+    }
+    if (!code) { $err.textContent = "Couldn't find a free room code. Try again."; return; }
+    const name = (setup.myName || "").trim() || "Host";
+    const state = { phase: "lobby", code, host: ME, members: [{ id: ME, name }], setup: { ...setup, phase: undefined } };
+    await ref.set({ state, updatedAt: Date.now() });
+    enterRoom(code, state);
+  } catch (e) {
+    $err.textContent = e && e.code === "invalid_argument"
+      ? "Your account can't create rooms in this game. Only the owner and people invited as Editors can."
+      : "Couldn't create the room. Check your connection and try again.";
+  }
+}
+
+async function joinRoom(code, name, $err) {
+  code = (code || "").toUpperCase().replace(/[^A-Z]/g, "");
+  if (code.length !== 4) { $err.textContent = "Room codes are 4 letters."; return; }
+  if (!name.trim()) { $err.textContent = "Add your name so the others know who's bidding."; return; }
+  const db = await getDb();
+  if (!db) { $err.textContent = "Online rooms only work when this game is opened in Claude while signed in."; return; }
+  const ref = db.doc("rooms/" + code);
+  try {
+    // A short lease stops two people joining at the same moment from overwriting each other.
+    for (let i = 0; i < 8; i++) {
+      const lease = await ref.acquire({ holder: ME, ttlMs: 1500 });
+      if (lease.acquired) break;
+      await sleep(400);
+    }
+    const snap = await ref.get();
+    if (!snap.exists) { $err.textContent = `There's no room called ${code}. Check the code with the host.`; return; }
+    const st = JSON.parse(JSON.stringify(snap.data().state));
+    if (st.members.some(m => m.id === ME)) return enterRoom(code, st);
+    if (st.phase !== "lobby") { $err.textContent = "That draft has already started. Ask the host to go back to the lobby."; return; }
+    if (st.members.length >= 6) { $err.textContent = "That room is full. Six players is the limit."; return; }
+    st.members.push({ id: ME, name: name.trim().slice(0, 20) });
+    await ref.set({ state: st, updatedAt: Date.now() });
+    enterRoom(code, st);
+  } catch (e) {
+    $err.textContent = e && e.code === "invalid_argument"
+      ? "Your account can't join yet. Ask the person who shared this game to invite you as an Editor, using your email."
+      : "Couldn't reach that room. Check your connection and try again.";
+  }
+}
+
+async function enterRoom(code, initial) {
+  const db = await getDb();
+  if (!db) { lsSet(ROOM_KEY, null); NET = null; S = load() || defaultSetup(); if (S.phase !== "home") S = defaultSetup(); render(); toast("Online rooms only work when this game is opened in Claude."); return; }
+  if (NET && NET.unsub) NET.unsub();
+  lsSet(ROOM_KEY, code);
+  NET = { code, ref: db.doc("rooms/" + code), unsub: null, slow: false };
+  S = initial ? JSON.parse(JSON.stringify(initial)) : { phase: "connecting", code };
+  render();
+  NET.loadTimer = setTimeout(() => { if (NET) { NET.slow = true; if (S.phase === "connecting") render(); } }, 10000);
+  const myNet = NET;
+  NET.unsub = NET.ref.onSnapshot(snap => {
+    if (NET !== myNet) return;
+    if (!snap.metadata.fromCache) { clearTimeout(NET.loadTimer); NET.slow = false; }
+    if (!snap.exists) { if (!snap.metadata.fromCache) { toast(`Room ${code} has closed.`); leaveRoom(true); } return; }
+    S = JSON.parse(JSON.stringify(snap.data().state));
+    render();
+  }, e => { if (NET === myNet) { clearTimeout(NET.loadTimer); netError(e); } });
+}
+
+async function leaveRoom(silent) {
+  const net = NET;
+  if (net) {
+    if (net.unsub) net.unsub();
+    clearTimeout(net.loadTimer);
+    // In the lobby, free your seat so the room list stays tidy.
+    if (S && S.phase === "lobby" && isMember()) {
+      try {
+        const snap = await net.ref.get();
+        if (snap.exists) {
+          const st = JSON.parse(JSON.stringify(snap.data().state));
+          st.members = st.members.filter(m => m.id !== ME);
+          if (st.members.length) { if (st.host === ME) st.host = st.members[0].id; await net.ref.set({ state: st, updatedAt: Date.now() }); }
+          else await net.ref.delete();
+        }
+      } catch (e) {}
+    }
+  }
+  NET = null; lsSet(ROOM_KEY, null);
+  if (P2P) { closePeers(); closePairing(); if (net) lsSet(mirrorKey(net.code), null); PN.code = null; PN.doc = null; PN.ver = 0; }
+  const prev = load();
+  S = Object.assign(defaultSetup(), prev && prev.phase === "setup" ? prev : {}, { phase: "home" });
+  render();
+}
+
+/* ---------------- rendering ---------------- */
+function render() {
+  clearInterval(spinInterval);
+  const inGame = !["home", "setup", "lobby", "connecting"].includes(S.phase);
+  $restart.hidden = !inGame;
+  $restart.textContent = confirmArmed ? $restart.textContent : (NET ? "Leave room" : "New game");
+  if (S.phase === "home") return renderHome();
+  if (S.phase === "setup") return renderSetup();
+  if (S.phase === "connecting") return renderConnecting();
+  if (S.phase === "lobby") return renderLobby();
+  if (S.phase === "end") return renderEnd();
+  renderTable();
+}
+
+function renderHome() {
+  const st = S;
+  const focusId = document.activeElement && $app.contains(document.activeElement) ? document.activeElement.id : null;
+  const online = dbAvailable;
+  $app.innerHTML = `
+  <div class="home">
+    <section class="panel mode-card">
+      <span class="label">Same room, one phone</span>
+      <h2>Pass the phone</h2>
+      <p class="note">Everyone plays on this device and hands it round when it's their turn to bid.</p>
+      <button class="primary" id="goLocal">Set up a game</button>
+    </section>
+    <section class="panel mode-card">
+      <span class="label">Everyone on their own phone</span>
+      <h2>Start a room</h2>
+      <p class="note">${P2P ? "You pick the genre and rules, then your partner scans a QR code on your phone. The phones talk directly over your Wi-Fi." : `You pick the genre and rules, then get a 4-letter code. Your partner joins with it on their phone${LOCAL ? " over your Wi-Fi" : ""}.`}</p>
+      <button class="primary" id="goHost" ${online === false ? "disabled" : ""}>Create a room</button>
+    </section>
+    <section class="panel mode-card">
+      <span class="label">Got a code?</span>
+      <h2>Join a room</h2>
+      <div class="join-row${P2P ? " solo" : ""}">
+        <input type="text" id="joinCode" class="code-input" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" aria-label="Room code" value="${esc(st.joinCode || "")}" ${P2P ? "hidden" : ""}>
+        <input type="text" id="joinName" maxlength="20" placeholder="Your name" aria-label="Your name" value="${esc(st.myName || "")}">
+      </div>
+      ${P2P ? `<p class="note">Stand next to the host. You'll scan a QR code on their phone.</p>` : ""}
+      <button class="primary" id="goJoin" ${online === false ? "disabled" : ""}>${P2P ? "Scan the host's code" : "Join"}</button>
+      <p class="error" id="joinErr"></p>
+      ${LOCAL ? `<div class="lan-rooms">
+        <span class="label">Rooms on this Wi-Fi</span>
+        ${lanRooms.length ? lanRooms.map(r => `<button class="lan-room" data-room="${esc(r.code)}"><b class="mono">${esc(r.code)}</b><span>${esc(r.names.join(", "))} waiting</span></button>`).join("")
+          : `<p class="note">None yet. When someone starts a room, it shows up here.</p>`}
+      </div>` : ""}
+    </section>
+  </div>
+  ${LOCAL && lanAddress() ? `<p class="note lan-hint">Other phones on this Wi-Fi open <b class="mono">${esc(lanAddress())}</b> in their browser.</p>` : ""}
+  ${online === false ? `<p class="note">Online rooms only work when this game is opened in Claude while signed in. You can still pass the phone.</p>` : ""}`;
+  document.getElementById("goLocal").onclick = () => { st.mode = "local"; st.phase = "setup"; save(); render(); };
+  document.getElementById("goHost").onclick = () => { st.mode = "host"; st.phase = "setup"; save(); render(); };
+  const $code = document.getElementById("joinCode"), $name = document.getElementById("joinName"), $err = document.getElementById("joinErr");
+  $code.addEventListener("input", () => { $code.value = $code.value.toUpperCase().replace(/[^A-Z]/g, ""); st.joinCode = $code.value; });
+  $name.addEventListener("input", () => { st.myName = $name.value; });
+  $name.addEventListener("change", () => { save(); });
+  if (focusId && document.getElementById(focusId)) { const f = document.getElementById(focusId); f.focus(); try { f.setSelectionRange(f.value.length, f.value.length); } catch (e) {} }
+  $app.querySelectorAll("[data-room]").forEach(b => b.onclick = () => {
+    $code.value = b.dataset.room; st.joinCode = b.dataset.room;
+    if (!$name.value.trim()) { $err.textContent = "Add your name, then tap the room again."; $name.focus(); return; }
+    go();
+  });
+  const go = async () => {
+    const btn = document.getElementById("goJoin"); btn.disabled = true; btn.textContent = "Joining…"; $err.textContent = "";
+    st.myName = $name.value; save();
+    if (P2P) {
+      btn.disabled = false; btn.textContent = "Scan the host's code";
+      if (!$name.value.trim()) { $err.textContent = "Add your name so the others know who's bidding."; return; }
+      return guestPair($name.value.trim());
+    }
+    await joinRoom($code.value, $name.value, $err);
+    if (S === st) { btn.disabled = false; btn.textContent = "Join"; }
+  };
+  document.getElementById("goJoin").onclick = go;
+  [$code, $name].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") go(); }));
+}
+
+function genreGrid(selected, includeCustom) {
+  return `<div class="genres">
+    ${GENRES.filter(x => includeCustom || x.id !== "custom").map(x => `
+      <button class="genre" data-genre="${x.id}" aria-pressed="${x.id === selected}">
+        <strong>${esc(x.name)}</strong>
+        <span>${esc(x.blurb)}</span>
+        <span class="wins">${x.stat ? `Winner: most ${esc(x.stat.label.toLowerCase())}` : "Winner: your own numbers, or a vote"}</span>
+      </button>`).join("")}
+  </div>`;
+}
+
+function renderSetup() {
+  const st = S;
+  const host = st.mode === "host";
+  const g = GENRES.find(x => x.id === st.genreId);
+  $app.innerHTML = `
+  <section class="panel setup">
+    <div><button class="ghost" id="backHome">← Back</button></div>
+    ${host ? `
+    <div class="field-row">
+      <h2>What should we call you?</h2>
+      <input type="text" id="myName" maxlength="20" placeholder="Your name" value="${esc(st.myName || "")}">
+      <p class="note">Everyone else adds their own name when they join with the code.</p>
+    </div>` : `
+    <div class="field-row">
+      <h2>Who's playing?</h2>
+      <div class="players-list" id="plist">
+        ${st.names.map((n, i) => `
+          <div class="player-input">
+            <span class="dot" style="background:var(${PCOLORS[i]})"></span>
+            <input type="text" id="pname-${i}" value="${esc(n)}" maxlength="20" aria-label="Player ${i + 1} name">
+            ${st.names.length > 2 ? `<button class="icon-btn" data-rm="${i}" aria-label="Remove player ${i + 1}">×</button>` : ""}
+          </div>`).join("")}
+      </div>
+      ${st.names.length < 6 ? `<button class="add-btn" id="addPlayer">+ Add a player</button>` : ""}
+    </div>`}
+
+    <div class="field-row">
+      <h2>Pick a genre</h2>
+      ${genreGrid(st.genreId, true)}
+      ${g.id === "custom" ? `
+        <div class="field-row">
+          <input type="text" id="customName" placeholder="Name your genre, e.g. Best Pixar films" value="${esc(st.customName)}">
+          <textarea id="customList" placeholder="One item per line. Add a detail and a score after dashes if you like:&#10;Toy Story - 1995 - 394&#10;Up - 2009 - 735&#10;WALL-E - 2008 - 521">${esc(st.custom)}</textarea>
+          <input type="text" id="customStat" placeholder="What the score means, e.g. Box office ($m)" value="${esc(st.customStat)}">
+          <p class="note">Highest combined score wins. Leave the scores out and you'll pick the winner together at the end.</p>
+        </div>` : ""}
+    </div>
+
+    <div class="field-row">
+      <h2>House rules</h2>
+      <div class="rules-grid">
+        <label class="rule"><span class="label">Budget each</span>
+          <input type="number" id="budget" min="5" max="1000" value="${st.budget}"></label>
+        <label class="rule"><span class="label">Draft slots each</span>
+          <input type="number" id="slots" min="1" max="10" value="${st.slots}"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="reserve" ${st.reserve ? "checked" : ""}>
+        <span>Keep £1 back for every empty slot, so nobody can blow their whole budget on one pick.</span></label>
+      <label class="check"><input type="checkbox" id="second" ${st.secondChance ? "checked" : ""}>
+        <span>If nobody bids on a lot, it goes to the back of the pile for one more go.</span></label>
+      <label class="check"><input type="checkbox" id="showStats" ${st.showStats ? "checked" : ""}>
+        <span>Show each lot's stat while bidding. Leave this off to keep the numbers secret until the final reveal.</span></label>
+    </div>
+
+    <ol class="howto">
+      <li>Lots come up one at a time in a random order.</li>
+      <li>${host ? "Each player bids from their own phone." : "Pass the device round."} On your turn, raise the price or drop out.</li>
+      <li>When everyone else has dropped out, the last bidder wins the lot into a slot.</li>
+      <li>The draft ends when the lots run out or every slot is full.</li>
+      <li>The biggest combined total for the genre's stat wins. On a tie, whoever has more money left wins.</li>
+    </ol>
+    <p class="error" id="err"></p>
+    <div><button class="primary" id="startBtn">${host ? "Create the room" : "Open the auction"}</button></div>
+  </section>`;
+
+  const readForm = () => {
+    if (host) st.myName = document.getElementById("myName").value;
+    else st.names = st.names.map((_, i) => document.getElementById("pname-" + i).value);
+    st.budget = Math.max(1, Math.min(1000, parseInt(document.getElementById("budget").value) || 20));
+    st.slots = Math.max(1, Math.min(10, parseInt(document.getElementById("slots").value) || 5));
+    st.reserve = document.getElementById("reserve").checked;
+    st.secondChance = document.getElementById("second").checked;
+    const cl = document.getElementById("customList"); if (cl) st.custom = cl.value;
+    const cn = document.getElementById("customName"); if (cn) st.customName = cn.value;
+    const cs = document.getElementById("customStat"); if (cs) st.customStat = cs.value;
+    st.showStats = document.getElementById("showStats").checked;
+    save();
+  };
+  $app.querySelectorAll("input,textarea").forEach(el => el.addEventListener("change", readForm));
+  document.getElementById("backHome").onclick = () => { readForm(); st.phase = "home"; save(); render(); };
+  $app.querySelectorAll("[data-genre]").forEach(b => b.onclick = () => { readForm(); st.genreId = b.dataset.genre; save(); render(); });
+  $app.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { readForm(); st.names.splice(+b.dataset.rm, 1); save(); render(); });
+  const add = document.getElementById("addPlayer");
+  if (add) add.onclick = () => { readForm(); st.names.push(`Player ${st.names.length + 1}`); save(); render();
+    document.getElementById("pname-" + (st.names.length - 1)).select(); };
+  document.getElementById("startBtn").onclick = async () => {
+    readForm();
+    const err = document.getElementById("err");
+    if (st.genreId === "custom") {
+      const n = st.custom.split("\n").filter(l => l.trim()).length;
+      if (n < 2) { err.textContent = "Add at least two items to your list, one per line."; return; }
+    }
+    if (st.reserve && st.budget < st.slots) { err.textContent = `With the £1-per-slot rule, the budget needs to be at least £${st.slots}.`; return; }
+    if (host) {
+      if (!st.myName.trim()) { err.textContent = "Add your name first."; return; }
+      const btn = document.getElementById("startBtn"); btn.disabled = true; btn.textContent = "Creating…";
+      await createRoom({ ...st }, err);
+      if (S === st) { btn.disabled = false; btn.textContent = "Create the room"; }
+      return;
+    }
+    act(() => startGame({ ...st }));
+  };
+}
+
+function p2pPanel(compact) {
+  const n = connectedPeers().length;
+  const amHost = S.host === ME;
+  const others = S.members ? S.members.length - 1 : 0;
+  if (amHost) {
+    const status = n ? `${n} phone${n > 1 ? "s" : ""} connected` : "No phones connected";
+    return `<span class="conn ${n ? "ok" : "off"}">${status}</span> <button class="${compact ? "ghost" : "primary"} pair-btn" data-pair="host">${n && others ? "Pair another phone" : "Pair a phone"}</button>`;
+  }
+  return n ? `<span class="conn ok">Connected to the host</span>`
+    : `<span class="conn off">Not connected</span> <button class="${compact ? "ghost" : "primary"} pair-btn" data-pair="guest">Reconnect</button>`;
+}
+function wireP2pPanel() {
+  $app.querySelectorAll("[data-pair]").forEach(b => b.onclick = () => {
+    if (b.dataset.pair === "host") hostPair();
+    else { const me = (S.members || []).find(m => m.id === ME); guestPair(me ? me.name : (load() || {}).myName || "Player"); }
+  });
+}
+
+function renderConnecting() {
+  $app.innerHTML = `<section class="panel lobby">
+    <span class="label">Room ${esc(S.code)}</span>
+    <h2>${NET && NET.slow ? "Can't reach the room yet" : "Connecting…"}</h2>
+    <p class="note">${NET && NET.slow ? "Still trying. Check your connection, or leave and join again with the code." : "Loading the latest moves."}</p>
+    <div><button class="ghost" id="leaveBtn">Leave room</button></div>
+  </section>`;
+  document.getElementById("leaveBtn").onclick = () => leaveRoom();
+}
+
+function renderLobby() {
+  const amHost = S.host === ME;
+  const hostName = (S.members.find(m => m.id === S.host) || {}).name || "the host";
+  const su = S.setup;
+  const g = GENRES.find(x => x.id === su.genreId);
+  const genreName = g.id === "custom" ? ((su.customName || "").trim() || "Custom list") : g.name;
+  const member = isMember();
+  $app.innerHTML = `
+  <section class="panel lobby">
+    <div class="lobby-top">
+      <div>
+        <span class="label">Room code</span>
+        <div class="room-code mono" aria-label="Room code ${S.code.split("").join(" ")}">${esc(S.code)}</div>
+      </div>
+      <button class="ghost" id="copyCode">Copy code</button>
+    </div>
+    ${P2P ? p2pPanel() : ""}
+    <p class="note" ${P2P ? "hidden" : ""}>${LOCAL && lanAddress() ? `On the other phone, open <b class="mono">${esc(lanAddress())}</b> on the same Wi-Fi and tap this room.` : `On the other phone, open this same game, tap <b>Join a room</b> and type the code.`}</p>
+    <div class="field-row">
+      <span class="label">In the room · ${S.members.length} of 6</span>
+      <div class="in-room">
+        ${S.members.map((m, i) => `<span class="chip" style="--pc:var(${PCOLORS[i]})"><i></i>${esc(m.name)}${m.id === ME ? " (you)" : ""}${m.id === S.host ? " · host" : ""}</span>`).join("")}
+      </div>
+    </div>
+    <div class="field-row">
+      <span class="label">Genre</span>
+      ${amHost ? genreGrid(su.genreId, su.genreId === "custom") : `<b class="lobby-genre">${esc(genreName)}</b>`}
+      <p class="note">${money(su.budget)} each · ${su.slots} slots · ${su.reserve ? "£1 kept back per empty slot" : "no money kept back"} · stats ${su.showStats ? "shown while bidding" : "hidden until the end"}</p>
+    </div>
+    ${!member ? `<p class="note">You're watching this room. Go back and join with the code to play.</p>` : ""}
+    <div class="actions">
+      ${amHost ? `<button class="primary" id="startOnline" ${S.members.length < 2 ? "disabled" : ""}>${S.members.length < 2 ? "Waiting for players to join" : "Start the draft"}</button>`
+               : `<p class="note">Waiting for ${esc(hostName)} to start the draft.</p>`}
+      <button class="ghost" id="leaveBtn">Leave room</button>
+    </div>
+  </section>`;
+  document.getElementById("copyCode").onclick = async () => {
+    try { await navigator.clipboard.writeText(S.code); toast("Code copied."); } catch (e) { toast(`The code is ${S.code}.`); }
+  };
+  document.getElementById("leaveBtn").onclick = () => leaveRoom();
+  wireP2pPanel();
+  if (amHost) {
+    $app.querySelectorAll("[data-genre]").forEach(b => b.onclick = () => {
+      const id = b.dataset.genre;
+      act(() => { if (S.phase !== "lobby") return false; S.setup.genreId = id; });
+    });
+    const sb = document.getElementById("startOnline");
+    if (sb) sb.onclick = () => act(() => { if (S.phase !== "lobby" || S.members.length < 2) return false; startGame(S.setup); });
+  }
+}
+
+const total = p => p.picks.reduce((s, k) => s + (k.value || 0), 0);
+function standings() {
+  // highest total wins; a tie goes to whoever has more money left
+  return S.players.map((p, i) => ({ i, total: total(p), left: p.budget }))
+    .sort((a, b) => b.total - a.total || b.left - a.left);
+}
+function boardsHTML(final, ranking) {
+  const showVals = S.stat && (final || S.showStats);
+  const seat = mySeat();
+  return `<section class="boards" aria-label="Draft boards">
+    ${S.players.map((p, i) => {
+      const leading = S.lot && S.lot.leader === i && S.phase === "auction";
+      const place = ranking ? ranking.findIndex(r => r.i === i) : -1;
+      return `<article class="board${place === 0 ? " champ" : ""}" style="--pc:var(${p.color})">
+        <div class="board-head"><h3>${esc(p.name)}${i === seat ? ` <span class="you">you</span>` : ""}${place === 0 ? ` <span class="crown">Winner</span>` : ""}</h3><span class="wallet">${money(p.budget)}</span></div>
+        <ol class="slots">
+          ${Array.from({ length: S.slots }, (_, k) => {
+            const pk = p.picks[k];
+            const isNew = S.lastSold && S.lastSold.player === i && S.lastSold.slot === k;
+            return pk ? `<li class="slot${isNew ? " new" : ""}"><span class="t">${esc(pk.title)}<small class="p">${money(pk.price)}</small></span><span class="v">${showVals ? fmtStat(pk.value, S.stat.fmt) : ""}</span></li>`
+                      : `<li class="slot empty"><span class="t">Empty slot</span><span></span></li>`;
+          }).join("")}
+        </ol>
+        ${showVals ? `<div class="board-total"><span class="label">${esc(S.stat.label)}</span><b class="mono">${fmtStat(total(p), S.stat.fmt)}</b></div>` : ""}
+        <div class="board-foot"><span>${final ? `Spent ${money(S.budget - p.budget)}` : empty(p) ? `Max bid now ${money(Math.max(0, maxBid(p)))}` : "Draft complete"}</span>${leading ? `<span>Leading</span>` : ""}${place > 0 ? `<span>${ordinal(place + 1)} place</span>` : ""}</div>
+      </article>`;
+    }).join("")}
+  </section>`;
+}
+const ordinal = n => n + (["th","st","nd","rd"][(n % 100 - 20) % 10] || ["th","st","nd","rd"][n % 100] || "th");
+
+function queueStrip() {
+  const n = S.queue.length;
+  return `<div class="queue-strip" aria-label="Lot ${S.pos + 1} of ${n}">
+    ${S.queue.map((_, i) => `<span class="qdot ${i < S.pos ? "done" : i === S.pos ? "now" : ""}"></span>`).join("")}
+    <span class="note" style="margin-left:6px">Lot ${Math.min(S.pos + 1, n)} of ${n}</span></div>`;
+}
+
+// The shuffle animation plays on every phone the first time it shows a new lot.
+let shownLot = null, spinUntil = 0, spinInterval = null, lastPrice = null;
+function renderTable() {
+  const L = S.lot;
+  const reveal = S.phase === "reveal";
+  const item = reveal ? S.queue[S.pos] : L.item;
+  const seat = mySeat();
+  const local = !NET;
+
+  const lotKey = reveal ? null : `${S.history.length}:${S.pos}:${item.title}`;
+  if (lotKey && lotKey !== shownLot) {
+    shownLot = lotKey;
+    if (S.phase === "auction" && !L.log.some(l => l.includes("bids")) && !reduceMotion()) {
+      spinUntil = Date.now() + 1400;
+      setTimeout(() => { if (S.phase === "auction" || S.phase === "sold") render(); }, 1450);
+    }
+  }
+  const spinning = Date.now() < spinUntil && S.phase === "auction";
+  const bumped = !!(L && lastPrice && lastPrice.key === lotKey && L.price > lastPrice.price);
+  lastPrice = L ? { key: lotKey, price: L.price } : null;
+
+  let side = "";
+  if (reveal) {
+    side = `<section class="panel turn">
+      <span class="label">Up next</span>
+      <h2 style="font-size:22px">Lot ${S.pos + 1} is ready</h2>
+      <p class="note">${local ? "Everyone look at the screen. " : ""}The bidding opens with ${esc(S.players[firstOpener()].name)}.</p>
+      ${local || seat >= 0 ? `<button class="primary" id="revealBtn">Reveal the lot</button>` : ""}
+    </section>`;
+  } else if (S.phase === "auction") {
+    const p = S.players[L.turn];
+    const mb = maxBid(p);
+    const mine = local || L.turn === seat;
+    const steps = [1, 2, 5].map(s => L.price + s);
+    const status = L.leader === null ? "No bids yet." : `${esc(S.players[L.leader].name)} leads at ${money(L.price)}.`;
+    side = `<section class="panel turn" style="--pc:var(${p.color})">
+      <div class="turn-who">
+        <div class="paddle" aria-hidden="true"><span>${L.turn + 1}</span></div>
+        <div>${mine
+          ? `<h2>${local ? esc(p.name) + ", you're" : "You're"} up</h2><p>${status} ${L.leader === null ? "Open the bidding or drop out." : ""} You can go up to ${money(mb)}.</p>`
+          : `<h2>${esc(p.name)} is deciding</h2><p>${status} Their phone shows the bid buttons.</p>`}</div>
+      </div>
+      ${mine ? `
+      <div class="bid-btns">
+        ${steps.map((v, k) => `<button class="bid-btn" data-bid="${v}" ${v > mb || spinning ? "disabled" : ""}>${money(v)}<small>+${[1, 2, 5][k]}</small></button>`).join("")}
+      </div>
+      <div class="custom-bid">
+        <input type="number" id="customBid" min="${L.price + 1}" max="${mb}" placeholder="Other amount" aria-label="Custom bid amount">
+        <button id="customBidBtn" ${spinning ? "disabled" : ""}>Bid</button>
+      </div>
+      <button class="drop-btn" id="dropBtn" ${spinning ? "disabled" : ""}>Drop out of this lot</button>` : `<div class="waiting" aria-hidden="true"><span></span><span></span><span></span></div>`}
+      <div class="in-room">
+        ${S.players.map((q, i) => {
+          const out = !L.active.includes(i);
+          return `<span class="chip ${out ? "out" : ""} ${L.leader === i ? "lead" : ""}" style="--pc:var(${q.color})"><i></i>${esc(q.name)}${i === seat ? " (you)" : ""}</span>`;
+        }).join("")}
+      </div>
+      ${L.log.length ? `<ul class="log">${L.log.map(l => `<li>${l}</li>`).join("")}</ul>` : ""}
+    </section>`;
+  } else {
+    const r = L.result;
+    const last = S.pos + 1 >= S.queue.length || !S.players.some(canStillBuy);
+    side = `<section class="panel turn">
+      <span class="label">Hammer down</span>
+      <h2 style="font-size:22px">${r.sold ? `${r.winner === seat ? "You take" : esc(S.players[r.winner].name) + " takes"} it for ${money(r.price)}` : "Nobody bid on this one"}</h2>
+      <p class="note">${r.sold ? `That fills slot ${S.players[r.winner].picks.length} of ${S.slots}.` : r.back ? "It goes to the back of the pile for one more chance." : "It's out of the draft."}</p>
+      ${L.log.length ? `<ul class="log">${L.log.map(l => `<li>${l}</li>`).join("")}</ul>` : ""}
+      ${local || seat >= 0 ? `<button class="primary" id="nextBtn">${last ? "See the final drafts" : "Next lot"}</button>` : ""}
+    </section>`;
+  }
+
+  const r = L && L.result;
+  $app.innerHTML = `
+  <div class="wrap" style="gap:20px">
+    ${NET ? `<div class="room-bar"><span class="label">Room</span> <b class="mono">${esc(S.code)}</b>${seat >= 0 ? ` <span class="note">You're ${esc(S.players[seat].name)}</span>` : ` <span class="note">Watching</span>`}${P2P ? p2pPanel(true) : ""}</div>` : ""}
+    <div class="stage">
+      <section class="panel lot" aria-live="polite">
+        <div class="lot-top"><span class="label">${esc(S.genre)}</span>${queueStrip()}</div>
+        <div>
+          <div class="lot-title ${reveal || spinning ? "spinning" : ""}" id="lotTitle">${reveal ? "?" : esc(item.title)}</div>
+          <div class="lot-sub" id="lotSub">${reveal || spinning ? "Shuffling the pile…" : esc(item.sub || "")}</div>
+          ${!reveal && !spinning && S.stat ? `<div class="lot-stat"><span class="label">${esc(S.stat.label)}</span> <b class="mono">${S.showStats ? fmtStat(item.value, S.stat.fmt) : "Hidden until the end"}</b></div>` : ""}
+        </div>
+        <div class="price-row">
+          <div><div class="label">${S.phase === "sold" ? "Hammer price" : "Current bid"}</div>
+            <div class="price ${bumped ? "bump" : ""}">${reveal ? "£–" : money(L.price)}</div></div>
+          <div class="leader"><div class="label">${S.phase === "sold" ? "Winner" : "Leading"}</div>
+            <b>${reveal ? "–" : L.leader === null ? "No bids" : esc(S.players[L.leader].name)}</b></div>
+        </div>
+        ${S.phase === "sold" ? `<div class="stamp ${r.sold ? "" : "unsold"}">${r.sold ? "SOLD" : "NO SALE"}</div>` : ""}
+      </section>
+      ${side}
+    </div>
+    ${boardsHTML()}
+  </div>`;
+
+  wireP2pPanel();
+  if (spinning) {
+    const el = document.getElementById("lotTitle");
+    const pool = S.queue.map(x => x.title);
+    spinInterval = setInterval(() => { el.textContent = pool[Math.floor(Math.random() * pool.length)]; }, 70);
+  }
+
+  const pos = S.pos;
+  if (reveal) {
+    const rb = document.getElementById("revealBtn");
+    if (rb) rb.onclick = () => { rb.disabled = true; act(() => { if (S.phase !== "reveal" || S.pos !== pos) return false; openLot(); }); };
+  } else if (S.phase === "auction") {
+    const turnSeat = L.turn;
+    const guarded = fn => act(() => { if (S.phase !== "auction" || S.pos !== pos || S.lot.turn !== turnSeat) return false; return fn(); });
+    $app.querySelectorAll("[data-bid]").forEach(b => b.onclick = () => guarded(() => bid(+b.dataset.bid)));
+    const db = document.getElementById("dropBtn");
+    if (db) db.onclick = () => guarded(drop);
+    const cb = document.getElementById("customBid");
+    if (cb) {
+      const go = () => { const v = parseInt(cb.value); if (v > L.price && v <= maxBid(S.players[L.turn])) guarded(() => bid(v)); else { cb.value = ""; cb.placeholder = `£${L.price + 1}–£${maxBid(S.players[L.turn])}`; cb.focus(); } };
+      document.getElementById("customBidBtn").onclick = go;
+      cb.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+    }
+  } else {
+    const nb = document.getElementById("nextBtn");
+    if (nb) nb.onclick = () => { nb.disabled = true; act(() => { if (S.phase !== "sold" || S.pos !== pos) return false; nextLot(); }); };
+  }
+}
+
+function renderEnd() {
+  const ps = S.players;
+  const spent = p => S.budget - p.budget;
+  const allPicks = ps.flatMap(p => p.picks.map(k => ({ ...k, who: p.name })));
+  const priciest = allPicks.slice().sort((a, b) => b.price - a.price)[0];
+  const bargain = allPicks.filter(k => k.price > 0).sort((a, b) => a.price - b.price)[0];
+  const unsold = S.history.filter(h => h.winner === null).map(h => h.title);
+  const unsoldUnique = [...new Set(unsold)].filter(t => !allPicks.some(k => k.title === t));
+  const canAct = !NET || isMember();
+  let ranking = null, head;
+  if (S.stat) {
+    ranking = standings();
+    const w = ranking[0], second = ranking[1];
+    const tie = second && second.total === w.total;
+    const wp = ps[w.i];
+    head = `<span class="label">${esc(S.genre)} · most ${esc(S.stat.label.toLowerCase())} wins</span>
+      <h2>${esc(wp.name)} wins with ${fmtStat(w.total, S.stat.fmt)}</h2>
+      <p class="note">${second ? (tie
+        ? `Level with ${esc(ps[second.i].name)} on ${fmtStat(second.total, S.stat.fmt)}, so it goes to money left: ${money(w.left)} to ${money(second.left)}.`
+        : `${esc(ps[second.i].name)} finished on ${fmtStat(second.total, S.stat.fmt)}.`) : ""}</p>
+      ${S.stat.source ? `<p class="source">Source: ${esc(S.stat.source)}</p>` : ""}`;
+  } else if (S.vote != null) {
+    ranking = [{ i: S.vote }];
+    head = `<span class="label">${esc(S.genre)} · decided by vote</span>
+      <h2>${esc(ps[S.vote].name)} wins the draft</h2>
+      ${canAct ? `<p class="note">Changed your minds? <button class="ghost" id="revote">Vote again</button></p>` : ""}`;
+  } else {
+    head = `<span class="label">${esc(S.genre)} · final drafts</span>
+      <h2>No stats for this list, so you decide. Who drafted best?</h2>
+      ${canAct ? `<div class="actions">${ps.map((p, i) => `<button class="vote-btn" data-vote="${i}" style="--pc:var(${p.color})">${esc(p.name)}</button>`).join("")}</div>` : ""}`;
+  }
+  const valuePick = S.stat ? allPicks.filter(k => k.price > 0 && k.value != null).sort((a, b) => b.value / b.price - a.value / a.price)[0] : null;
+  $app.innerHTML = `
+  <div class="wrap" style="gap:20px">
+    <section class="panel" style="display:grid;gap:18px">
+      ${P2P && NET ? `<div class="room-bar">${p2pPanel(true)}</div>` : ""}
+      <div class="results-head">${head}</div>
+      <div class="awards">
+        ${priciest ? `<div class="award"><span>Biggest spend</span><b>${esc(priciest.title)}</b><span>${esc(priciest.who)} paid ${money(priciest.price)}</span></div>` : ""}
+        ${valuePick ? `<div class="award"><span>Best value for money</span><b>${esc(valuePick.title)}</b><span>${esc(valuePick.who)} got ${fmtStat(valuePick.value, S.stat.fmt)} for ${money(valuePick.price)}</span></div>`
+          : bargain && bargain !== priciest ? `<div class="award"><span>Bargain of the night</span><b>${esc(bargain.title)}</b><span>${esc(bargain.who)} paid ${money(bargain.price)}</span></div>` : ""}
+        <div class="award"><span>Money left on the table</span><b>${ps.map(p => `${esc(p.name)} ${money(p.budget)}`).join(" · ")}</b><span>Spent: ${ps.map(p => money(spent(p))).join(" vs ")}</span></div>
+        ${unsoldUnique.length ? `<div class="award"><span>Nobody wanted</span><b>${unsoldUnique.map(esc).join(", ")}</b><span>Left unsold</span></div>` : ""}
+      </div>
+      ${canAct ? `<div class="actions">
+        <button class="primary" id="againBtn">Rematch, same genre</button>
+        <button class="ghost" id="newBtn" style="padding:14px 18px">${NET ? "Back to the lobby" : "Change genre or players"}</button>
+      </div>` : ""}
+    </section>
+    ${boardsHTML(true, ranking)}
+  </div>`;
+  $app.querySelectorAll("[data-vote]").forEach(b => b.onclick = () => { const v = +b.dataset.vote; act(() => { if (S.phase !== "end") return false; S.vote = v; }); });
+  const rv = document.getElementById("revote"); if (rv) rv.onclick = () => act(() => { if (S.phase !== "end") return false; S.vote = null; });
+  wireP2pPanel();
+  const again = document.getElementById("againBtn");
+  if (again) again.onclick = () => act(() => { if (S.phase !== "end") return false; startGame(S.setup); });
+  const nb = document.getElementById("newBtn");
+  if (nb) nb.onclick = () => NET
+    ? act(() => { if (S.phase !== "end") return false; S = { phase: "lobby", code: S.code, host: S.host, members: S.members, setup: S.setup }; })
+    : toSetup();
+}
+
+function toSetup() {
+  const prev = S && S.setup ? S.setup : null;
+  S = Object.assign(defaultSetup(), prev || {}, { phase: "setup", mode: "local" });
+  save(); render();
+}
+
+/* the header button needs a second tap to confirm, since dialogs don't show here */
+let confirmArmed = false, armTimer;
+$restart.onclick = () => {
+  if (S.phase === "end" && !NET) return toSetup();
+  if (!confirmArmed) {
+    confirmArmed = true; $restart.textContent = NET ? "Tap again to leave" : "Tap again to abandon this draft"; clearTimeout(armTimer);
+    armTimer = setTimeout(() => { confirmArmed = false; $restart.textContent = NET ? "Leave room" : "New game"; }, 3000); return;
+  }
+  confirmArmed = false; clearTimeout(armTimer);
+  $restart.textContent = "New game";
+  if (NET) leaveRoom(); else toSetup();
+};
+
+function start(data) {
+  const room = (data && data.room) || lsGet(ROOM_KEY);
+  getDb().then(db => { dbAvailable = !!db; if (S && S.phase === "home") render(); });
+  if (LOCAL) { pollLan(); setInterval(() => { if (S && (S.phase === "home" || S.phase === "lobby")) pollLan(); }, 2000); }
+  if (room) { S = { phase: "connecting", code: room }; enterRoom(room); return; }
+  const restored = (data && data.S) || load();
+  const ok = restored && ["home", "setup", "reveal", "auction", "sold", "end"].includes(restored.phase) && (restored.phase === "home" || restored.phase === "setup" || restored.players);
+  S = ok ? restored : defaultSetup();
+  if (S.phase === "setup" && S.mode === "host") S.mode = "host";
+  render();
+}
+window.claude?.hot?.snapshot?.(() => ({ S: NET ? null : S, room: NET ? NET.code : null }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
