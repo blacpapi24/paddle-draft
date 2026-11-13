@@ -192,6 +192,7 @@ textarea { min-height: 140px; resize: vertical; }
 .winby { display: flex; flex-wrap: wrap; gap: 8px; }
 .winby button { border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 14px; cursor: pointer; min-height: 40px; }
 .winby button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.genre-tabs { margin-bottom: 4px; }
 .rules-box { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 12px; }
 .lot-stat { margin-top: 10px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .lot-stat b { font-size: 15px; }
@@ -305,6 +306,31 @@ const GENRES = [
     ["The Dark Knight","2008",1008],["The Return of the King","2003",1149],["Spirited Away","2001",359],["Gladiator","2000",465],
     ["No Country for Old Men","2007",172],["There Will Be Blood","2007",76],["The Departed","2006",291],
     ["Finding Nemo","2003",942],["Inglourious Basterds","2009",321],["City of God","2002",31] ]},
+  { id: "films-1990s", name: "Movies of the 1990s", blurb: "Titanic, dinosaurs and Tarantino",
+    stat: { label: "Worldwide box office", fmt: "usdm", source: "Wikipedia box office tables (Box Office Mojo / The Numbers), Nov 2026" }, items: [
+    ["Titanic","1997",1843],["Jurassic Park","1993",915],["Forrest Gump","1994",677],["The Matrix","1999",464],
+    ["Pulp Fiction","1994",214],["The Shawshank Redemption","1994",73],["Home Alone","1990",477],["Independence Day","1996",817],
+    ["The Silence of the Lambs","1991",276],["Men in Black","1997",589] ]},
+  { id: "pixar", name: "Pixar films", blurb: "Toys, fish, monsters and robots",
+    stat: { label: "Worldwide box office", fmt: "usdm", source: "Wikipedia box office tables (Box Office Mojo / The Numbers), Nov 2026" }, items: [
+    ["Toy Story","1995",394],["Toy Story 3","2010",1067],["Finding Nemo","2003",871],["The Incredibles","2004",631],
+    ["Incredibles 2","2018",1243],["Up","2009",735],["WALL-E","2008",521],["Coco","2017",815],
+    ["Inside Out","2015",858],["Monsters, Inc.","2001",529] ]},
+  { id: "disney", name: "Disney animation", blurb: "Princesses, lions and snowmen",
+    stat: { label: "Worldwide box office", fmt: "usdm", source: "Wikipedia box office tables (Box Office Mojo / The Numbers), Nov 2026" }, items: [
+    ["Frozen","2013",1290],["Frozen II","2019",1450],["Moana","2016",643],["Zootopia","2016",1024],
+    ["Tangled","2010",592],["Encanto","2021",261],["Big Hero 6","2014",658],["Aladdin","1992",504],
+    ["The Lion King","1994",969],["Beauty and the Beast","1991",425] ]},
+  { id: "marvel", name: "Marvel films", blurb: "Avengers, assemble",
+    stat: { label: "Worldwide box office", fmt: "usdm", source: "Wikipedia box office tables (Box Office Mojo / The Numbers), Nov 2026" }, items: [
+    ["Iron Man","2008",586],["The Avengers","2012",1521],["Black Panther","2018",1375],["Avengers: Infinity War","2018",2052],
+    ["Avengers: Endgame","2019",2799],["Guardians of the Galaxy","2014",773],["Thor: Ragnarok","2017",855],
+    ["Captain America: Civil War","2016",1155],["Deadpool & Wolverine","2024",1338],["Doctor Strange","2016",678] ]},
+  { id: "horror", name: "Horror films", blurb: "Watch through your fingers",
+    stat: { label: "Worldwide box office", fmt: "usdm", source: "Wikipedia box office tables (Box Office Mojo / The Numbers), Nov 2026" }, items: [
+    ["It","2017",720],["The Conjuring","2013",320],["Get Out","2017",256],["A Quiet Place","2018",341],
+    ["The Exorcist","1973",431],["Halloween","2018",260],["Scream","1996",173],["Saw","2004",104],
+    ["The Sixth Sense","1999",673],["Jaws","1975",495] ]},
   { id: "celebs", name: "Celebrities", blurb: "The most followed people on Instagram",
     stats: [
       { id: "followers", label: "Instagram followers", fmt: "followers", source: "Instagram follower counts via Wikipedia, mid 2026" },
@@ -324,11 +350,33 @@ const GENRES = [
     ["Drake","Toronto",5,"1986-10-24"],["Ariana Grande","Florida",3,"1993-06-26"],["Bruno Mars","Hawaii",16,"1985-10-08"],
     ["The Weeknd","Toronto",4,"1990-02-16"],["Adele","London",16,"1988-05-05"],["Billie Eilish","Los Angeles",10,"2001-12-18"],
     ["Ed Sheeran","Halifax",4,"1991-02-17"] ]},
-  { id: "tv", name: "TV shows", blurb: "Prestige drama and great comedy",
-    stat: { label: "IMDb rating", fmt: "rating", source: "IMDb user ratings, approximate" }, items: [
-    ["Breaking Bad","2008–2013",9.5],["The Sopranos","1999–2007",9.2],["The Wire","2002–2008",9.3],
-    ["Game of Thrones","2011–2019",9.2],["Succession","2018–2023",8.8],["Fleabag","2016–2019",8.7],
-    ["Better Call Saul","2015–2022",9.0],["The Bear","2022–",8.5],["Stranger Things","2016–2025",8.6],["The Office (US)","2005–2013",9.0] ]},
+  { id: "tv", name: "Prestige TV", blurb: "The dramas everyone talks about",
+    stats: [
+      { id: "imdb", label: "IMDb rating", fmt: "rating", source: "IMDb user ratings, approximate" },
+      { id: "episodes", label: "Episodes", fmt: "int", source: "Episode counts" } ],
+    items: [
+    ["Breaking Bad","2008–2013",9.5,62],["The Sopranos","1999–2007",9.2,86],["The Wire","2002–2008",9.3,60],
+    ["Game of Thrones","2011–2019",9.2,73],["Succession","2018–2023",8.8,39],["Fleabag","2016–2019",8.7,12],
+    ["Better Call Saul","2015–2022",9.0,63],["The Bear","2022–",8.5,38],["Stranger Things","2016–2025",8.6,42],["The Office (US)","2005–2013",9.0,201] ]},
+  { id: "sitcoms", name: "Sitcoms", blurb: "Comfort TV you've seen a hundred times",
+    stats: [{ id: "episodes", label: "Episodes", fmt: "int", source: "Episode counts from Wikipedia, Nov 2026" }, { id: "seasons", label: "Seasons", fmt: "int", source: "Seasons or series from Wikipedia, Nov 2026" }],
+    items: [
+    ["Friends","1994–2004",236,10],["Seinfeld","1989–1998",180,9],["The Office (US)","2005–2013",201,9],
+    ["Brooklyn Nine-Nine","2013–2021",153,8],["Parks and Recreation","2009–2015",126,7],["Modern Family","2009–2020",250,11],
+    ["The Big Bang Theory","2007–2019",279,12],["How I Met Your Mother","2005–2014",208,9],
+    ["The Fresh Prince of Bel-Air","1990–1996",148,6],["Only Fools and Horses","1981–2003",64,7] ]},
+  { id: "netflix", name: "Netflix hits", blurb: "The shows you binged in a weekend",
+    stats: [{ id: "episodes", label: "Episodes", fmt: "int", source: "Episode counts from Wikipedia, Nov 2026" }, { id: "seasons", label: "Seasons", fmt: "int", source: "Seasons or series from Wikipedia, Nov 2026" }],
+    items: [
+    ["Stranger Things","2016–2025",42,5],["Squid Game","2021–2025",22,3],["Wednesday","2022–",16,2],
+    ["The Crown","2016–2023",60,6],["Bridgerton","2020–",32,4],["Money Heist","2017–2021",41,5],
+    ["Ozark","2017–2022",44,4],["The Witcher","2019–",32,4],["Narcos","2015–2017",30,3],["Black Mirror","2011–",33,7] ]},
+  { id: "british-tv", name: "British TV", blurb: "Proper telly from this side of the pond",
+    stats: [{ id: "episodes", label: "Episodes", fmt: "int", source: "Episode counts from Wikipedia, Nov 2026" }, { id: "seasons", label: "Seasons", fmt: "int", source: "Seasons or series from Wikipedia, Nov 2026" }],
+    items: [
+    ["Peaky Blinders","2013–2022",36,6],["Line of Duty","2012–",36,6],["Sherlock","2010–2017",13,4],
+    ["Gavin & Stacey","2007–2024",22,3],["The Office (UK)","2001–2003",14,2],["Downton Abbey","2010–2015",52,6],
+    ["Luther","2010–2019",20,5],["Top Boy","2011–2023",32,5],["Skins","2007–2013",61,7],["Fleabag","2016–2019",12,2] ]},
   { id: "albums-2010s", name: "Albums of the 2010s", blurb: "Records that defined the decade",
     stats: [
       { id: "meta", label: "Metacritic critics' score", fmt: "int", source: "Metacritic Metascores" },
@@ -355,6 +403,29 @@ const GENRES = [
     ["Red Dead Redemption 2","2018",87,97],["The Witcher 3","2015",65,93],["Breath of the Wild","2017",36,97],["Skyrim","2011",65,94],
     ["Minecraft","2011",425,93],["Grand Theft Auto V","2013",215,97],["Mario Kart 8 Deluxe","2017",72,92],["Portal 2","2011",4,95],
     ["God of War","2018",23,94],["Super Smash Bros. Ultimate","2018",38,93] ]},
+  { id: "consoles", name: "Games consoles", blurb: "The best-selling machines ever",
+    stat: { label: "Units sold", fmt: "millions", source: "Wikipedia list of best-selling game consoles, Nov 2026" }, items: [
+    ["PlayStation 2","Sony · 2000",160],["Nintendo DS","Nintendo · 2004",154.02],["Nintendo Switch","Nintendo · 2017",157.2],
+    ["Game Boy","Nintendo · 1989",118.69],["PlayStation 4","Sony · 2013",117.2],["PlayStation","Sony · 1994",102.49],
+    ["Wii","Nintendo · 2006",101.63],["PlayStation 5","Sony · 2020",95.3],["PlayStation 3","Sony · 2006",87.4],["Xbox 360","Microsoft · 2005",84] ]},
+  { id: "games-switch", name: "Nintendo Switch hits", blurb: "Mario, Zelda, Pokémon and pals",
+    stats: [
+      { id: "sold", label: "Copies sold", fmt: "m1", source: "Nintendo sales figures via Wikipedia, mostly to Sept 2026" },
+      { id: "meta", label: "Metacritic score", fmt: "int", source: "Metacritic Switch scores via Wikipedia (Pokémon scores approximate)" } ],
+    items: [
+    ["Mario Kart 8 Deluxe","2017",72.0,92],["Animal Crossing: New Horizons","2020",50.63,90],["Super Smash Bros. Ultimate","2018",38.5,93],
+    ["Zelda: Breath of the Wild","2017",34.28,97],["Super Mario Odyssey","2017",31.06,97],["Pokémon Scarlet and Violet","2022",28.66,72],
+    ["Pokémon Sword and Shield","2019",27.36,80],["Zelda: Tears of the Kingdom","2023",22.9,96],["Super Mario Party","2018",21.39,76],
+    ["Super Mario Bros. Wonder","2023",17.44,92] ]},
+  { id: "games-2020s", name: "Video games of the 2020s", blurb: "The big releases of this decade",
+    stats: [
+      { id: "meta", label: "Metacritic score", fmt: "int", source: "Metacritic scores via Wikipedia, launch platform" },
+      { id: "sold", label: "Copies sold", fmt: "m1", source: "Latest publisher sales figures via Wikipedia; dates vary" } ],
+    items: [
+    ["Elden Ring","FromSoftware · 2022",96,30],["Baldur's Gate 3","Larian · 2023",96,20],["Hogwarts Legacy","Avalanche · 2023",84,40],
+    ["Cyberpunk 2077","CD Projekt · 2020",86,40],["God of War Ragnarök","Santa Monica · 2022",94,15],["Astro Bot","Team Asobi · 2024",94,4.3],
+    ["Ghost of Tsushima","Sucker Punch · 2020",83,13],["Helldivers 2","Arrowhead · 2024",82,20],["Resident Evil Village","Capcom · 2021",84,14.9],
+    ["Marvel's Spider-Man 2","Insomniac · 2023",90,11] ]},
   { id: "countries", name: "Biggest countries", blurb: "The ten most populous nations",
     stats: [
       { id: "pop", label: "Population", fmt: "pop", source: "UN and national estimates, 2025-26" },
@@ -405,6 +476,7 @@ function fmtStat(v, fmt) {
     case "age": return Math.round(v) + " yrs";
     case "length": { const t = Math.round(v); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); }
     case "one": return (+v).toFixed(1);
+    case "m1": return (+v).toFixed(1).replace(/\.0$/, "") + "m";
     default: return Math.round(v).toLocaleString("en-GB");
   }
 }
@@ -1136,9 +1208,22 @@ function renderHome() {
   [$code, $name].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") go(); }));
 }
 
+// Genres are grouped into tabs (Movies, TV, Gaming...) so the list stays short
+// on a phone. The open tab is only a view; it doesn't change the chosen genre.
+const GROUPS = [["movies", "Movies"], ["tv", "TV"], ["gaming", "Gaming"], ["music", "Music"], ["sport", "Sport"], ["world", "People and places"], ["food", "Food"], ["custom", "Make your own"]];
+const GROUP_OF = { tv: "tv", sitcoms: "tv", netflix: "tv", "british-tv": "tv", consoles: "gaming", switch: "gaming", "albums-2010s": "music", "songs-2000s": "music",
+  popstars: "music", consoles: "gaming", "pl-legends": "sport", "pl-clubs": "sport", celebs: "world", countries: "world", "fast-food": "food", custom: "custom" };
+const groupOf = g => g.group || GROUP_OF[g.id] || (/^games/.test(g.id) ? "gaming" : "movies");
+let genreTab = null;
 function genreGrid(selected, includeCustom) {
-  return `<div class="genres">
-    ${GENRES.filter(x => includeCustom || x.id !== "custom").map(x => `
+  const sel = GENRES.find(x => x.id === selected);
+  const groups = GROUPS.filter(([id]) => (includeCustom || id !== "custom") && GENRES.some(x => groupOf(x) === id));
+  if (!genreTab || !groups.some(([id]) => id === genreTab)) genreTab = sel ? groupOf(sel) : groups[0][0];
+  return `<div class="winby genre-tabs" role="tablist" aria-label="Genre groups">
+    ${groups.map(([id, name]) => `<button type="button" role="tab" data-gtab="${id}" aria-pressed="${id === genreTab}" aria-selected="${id === genreTab}">${esc(name)}${sel && groupOf(sel) === id && id !== genreTab ? " •" : ""}</button>`).join("")}
+  </div>
+  <div class="genres">
+    ${GENRES.filter(x => groupOf(x) === genreTab).map(x => `
       <button class="genre" data-genre="${x.id}" aria-pressed="${x.id === selected}">
         <strong>${esc(x.name)}</strong>
         <span>${esc(x.blurb)}</span>
@@ -1146,9 +1231,13 @@ function genreGrid(selected, includeCustom) {
       </button>`).join("")}
   </div>`;
 }
+// Tab clicks just redraw, without touching game state.
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-gtab]");
+  if (!t) return;
+  genreTab = t.dataset.gtab; render();
+});
 
-// "How to win" plus the house rules. Used in setup and, for the host, in the lobby
-// and between rounds, so the rules can change without starting over.
 function rulesHTML(su) {
   const g = GENRES.find(x => x.id === su.genreId) || GENRES[0];
   const stat = g.id === "custom" ? null : statFor(g, su.winBy);
