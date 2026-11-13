@@ -624,10 +624,12 @@ function p2pReceive(peer, raw) {
   if (msg.code !== PN.code) return;
   // Newest copy wins. On a tie the host's copy wins.
   const newer = msg.v > PN.ver || (msg.v === PN.ver && !PN.isHost && JSON.stringify(msg.d) !== JSON.stringify(PN.doc));
-  if (!newer) return;
-  p2pStore(msg.d, msg.v);
-  if (PN.isHost) p2pBroadcast(msg, peer);
-  p2pNotify();
+  if (newer) {
+    p2pStore(msg.d, msg.v);
+    if (PN.isHost) p2pBroadcast(msg, peer);
+    p2pNotify();
+  }
+  // A guest waiting to (re)join only needs to hear from the host, newer or not.
   if (pairing && pairing.onDoc) pairing.onDoc();
   if (docWaiter) { const w = docWaiter; docWaiter = null; w(); }
 }
@@ -786,7 +788,30 @@ let wakeLock = null;
 async function keepAwake() {
   try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); } } catch (e) { }
 }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && connectedPeers().length) keepAwake(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (connectedPeers().length) keepAwake();
+  reconnectSoon();
+});
+// Phones pause the page when you switch apps, which can drop the link.
+// Coming back (or every few seconds while it's down) we quietly reconnect:
+// the host re-opens its room code, and a guest rejoins it.
+let rejoining = false;
+function reconnectSoon() {
+  if (!P2P || !NET || !S || !S.host || S.phase === "connecting") return;
+  if (S.host === ME) {
+    if (!hostPeer || hostPeer.destroyed) { hostPeer = null; hostPeerCode = null; hostListen(); }
+    else if (hostPeer.disconnected) { try { hostPeer.reconnect(); } catch (e) { } }
+    return;
+  }
+  if (rejoining || connectedPeers().length || pairing) return;
+  if (!(S.members || []).some(m => m.id === ME)) return;
+  rejoining = true;
+  const me = S.members.find(m => m.id === ME);
+  const $e = document.createElement("p");
+  codeJoin(NET.code, me.name, $e).finally(() => { rejoining = false; render(); });
+}
+setInterval(() => { if (document.visibilityState === "visible") reconnectSoon(); }, 6000);
 
 // --- libraries, loaded only on the phone-to-phone copy ---
 const libs = {};
@@ -1482,7 +1507,7 @@ function p2pPanel(compact) {
     return `<span class="conn ${n ? "ok" : "off"}">${status}</span> <button class="ghost pair-btn" data-pair="host">Pair by QR code instead</button>`;
   }
   return n ? `<span class="conn ok">Connected to the host</span>`
-    : `<span class="conn off">Not connected</span> <button class="${compact ? "ghost" : "primary"} pair-btn" data-pair="rejoin">Reconnect</button> <button class="ghost pair-btn" data-pair="guest">Scan QR instead</button>`;
+    : rejoining ? `<span class="conn off">Reconnecting…</span>` : `<span class="conn off">Not connected</span> <button class="${compact ? "ghost" : "primary"} pair-btn" data-pair="rejoin">Reconnect</button> <button class="ghost pair-btn" data-pair="guest">Scan QR instead</button>`;
 }
 function wireP2pPanel() {
   $app.querySelectorAll("[data-pair]").forEach(b => b.onclick = () => {
@@ -1833,12 +1858,7 @@ function start(data) {
   if (LOCAL) { pollLan(); setInterval(() => { if (S && (S.phase === "home" || S.phase === "lobby")) pollLan(); }, 2000); }
   if (room) {
     S = { phase: "connecting", code: room }; enterRoom(room);
-    if (P2P) setTimeout(() => {
-      if (!NET || NET.code !== room || !S || !S.host || S.host === ME || connectedPeers().length) return;
-      const me = (S.members || []).find(m => m.id === ME);
-      const $e = document.createElement("p");
-      codeJoin(room, me ? me.name : ((load() || {}).myName || "Player"), $e).then(() => { if ($e.textContent) render(); });
-    }, 300);
+    if (P2P) setTimeout(reconnectSoon, 300);
     return;
   }
   const restored = (data && data.S) || load();
