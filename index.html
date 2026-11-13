@@ -629,6 +629,7 @@ function p2pReceive(peer, raw) {
   if (PN.isHost) p2pBroadcast(msg, peer);
   p2pNotify();
   if (pairing && pairing.onDoc) pairing.onDoc();
+  if (docWaiter) { const w = docWaiter; docWaiter = null; w(); }
 }
 function makeP2pDb() {
   return { doc(path) {
@@ -651,6 +652,92 @@ function makeP2pDb() {
 }
 const connectedPeers = () => PN.peers.filter(p => p.dc && p.dc.readyState === "open");
 function closePeers() { for (const p of PN.peers) { try { p.pc.close(); } catch (e) { } } PN.peers = []; }
+
+// --- joining by room code ---
+// Phones find each other through PeerJS's free public broker, using the room
+// code as the host's address. Once they're connected, game moves go straight
+// from phone to phone. This works from different rooms, or even different
+// Wi-Fi networks. QR pairing stays as a backup.
+const PEER_PREFIX = "paddle-draft-x7k2-";
+const peerOpts = () => Object.assign({ debug: 0 }, window.PADDLE_PEER_SERVER || {});
+let hostPeer = null, hostPeerCode = null, hostRetry = null, docWaiter = null, guestPeer = null;
+function adaptConn(conn) {
+  const dc = {
+    get readyState() { return conn.open ? "open" : "connecting"; },
+    send: s => conn.send(s),
+    set onmessage(f) { conn.on("data", d => f({ data: typeof d === "string" ? d : JSON.stringify(d) })); },
+    set onopen(f) { conn.on("open", f); },
+    set onclose(f) { conn.on("close", f); },
+  };
+  return { pc: { close: () => { try { conn.close(); } catch (e) { } } }, dc, conn };
+}
+async function hostListen() {
+  if (!P2P || !NET || !S || S.host !== ME) return;
+  if (hostPeer && hostPeerCode === NET.code && !hostPeer.destroyed) return;
+  const code = NET.code;
+  hostPeerCode = code;
+  try { await loadScript("vendor/peerjs.min.js"); } catch (e) { hostPeerCode = null; return; }
+  if (!NET || NET.code !== code) return;
+  if (hostPeer) { try { hostPeer.destroy(); } catch (e) { } }
+  PN.isHost = true;
+  const p = new Peer(PEER_PREFIX + code, peerOpts());
+  hostPeer = p;
+  p.on("open", () => { if (hostPeer === p) render(); });
+  p.on("connection", conn => {
+    const peer = adaptConn(conn);
+    PN.peers = PN.peers.filter(x => x.dc && x.dc.readyState === "open");
+    PN.peers.push(peer);
+    wirePeer(peer);
+  });
+  p.on("disconnected", () => { if (hostPeer === p && !p.destroyed) setTimeout(() => { try { if (hostPeer === p && !p.destroyed) p.reconnect(); } catch (e) { } }, 3000); });
+  p.on("error", e => {
+    if (hostPeer !== p || e.type === "peer-unavailable") return;
+    // The code can still be held for a few seconds after a reload; keep trying.
+    clearTimeout(hostRetry);
+    hostRetry = setTimeout(() => { if (hostPeer === p) { try { p.destroy(); } catch (x) { } hostPeer = null; hostListen(); } }, 4000);
+  });
+}
+function stopHostListen() {
+  clearTimeout(hostRetry);
+  if (hostPeer) { try { hostPeer.destroy(); } catch (e) { } }
+  hostPeer = null; hostPeerCode = null;
+  if (guestPeer) { try { guestPeer.destroy(); } catch (e) { } }
+  guestPeer = null; docWaiter = null;
+}
+const hostOnline = () => !!(hostPeer && hostPeer.open);
+async function codeJoin(code, name, $err) {
+  code = (code || "").toUpperCase().replace(/[^A-Z]/g, "");
+  if (code.length !== 4) { $err.textContent = "Room codes are 4 letters."; return; }
+  if (!name.trim()) { $err.textContent = "Add your name so the others know who's bidding."; return; }
+  try { await loadScript("vendor/peerjs.min.js"); } catch (e) { $err.textContent = "Couldn't load the game's connection code. Check your internet and try again."; return; }
+  if (guestPeer) { try { guestPeer.destroy(); } catch (e) { } }
+  closePeers();
+  const p = new Peer(peerOpts());
+  guestPeer = p;
+  await new Promise(resolve => {
+    let done = false;
+    const finish = msg => { if (done) return; done = true; clearTimeout(t); docWaiter = null; if (msg) { $err.textContent = msg; try { p.destroy(); } catch (e) { } } resolve(); };
+    const t = setTimeout(() => finish(`Couldn't reach room ${code}. Check the code, and ask the host to keep the game open on their screen.`), 20000);
+    p.on("error", e => finish(e.type === "peer-unavailable"
+      ? `Can't find room ${code}. Check the code, and ask the host to keep the game open on their screen.`
+      : "Couldn't connect. Check your internet and try again."));
+    p.on("open", () => {
+      PN.isHost = false;
+      useRoom(code);
+      const conn = p.connect(PEER_PREFIX + code, { serialization: "raw", reliable: true });
+      const peer = adaptConn(conn);
+      conn.on("open", () => { PN.peers = [peer]; });
+      wirePeer(peer);
+      docWaiter = async () => {
+        if (done) return;
+        done = true; clearTimeout(t);
+        if (NET && NET.code === code) { render(); return resolve(); }
+        await joinRoom(code, name, $err);
+        resolve();
+      };
+    });
+  });
+}
 
 // --- pairing codes: compressed SDP, base64url ---
 async function packSignal(obj) {
@@ -1136,7 +1223,7 @@ async function leaveRoom(silent) {
     }
   }
   NET = null; lsSet(ROOM_KEY, null);
-  if (P2P) { closePeers(); closePairing(); if (net) lsSet(mirrorKey(net.code), null); PN.code = null; PN.doc = null; PN.ver = 0; }
+  if (P2P) { stopHostListen(); closePeers(); closePairing(); if (net) lsSet(mirrorKey(net.code), null); PN.code = null; PN.doc = null; PN.ver = 0; }
   const prev = load();
   S = Object.assign(defaultSetup(), prev && prev.phase === "setup" ? prev : {}, { phase: "home" });
   render();
@@ -1145,6 +1232,7 @@ async function leaveRoom(silent) {
 /* ---------------- rendering ---------------- */
 function render() {
   clearInterval(spinInterval);
+  if (P2P && NET && S && S.host === ME) hostListen();
   const inGame = !["home", "setup", "lobby", "connecting"].includes(S.phase);
   $restart.hidden = !inGame;
   $restart.textContent = confirmArmed ? $restart.textContent : (NET ? "Leave room" : "New game");
@@ -1171,18 +1259,18 @@ function renderHome() {
     <section class="panel mode-card">
       <span class="label">Everyone on their own phone</span>
       <h2>Start a room</h2>
-      <p class="note">${P2P ? "You pick the genre and rules, then your partner scans a QR code on your phone. The phones talk directly over your Wi-Fi." : `You pick the genre and rules, then get a 4-letter code. Your partner joins with it on their phone${LOCAL ? " over your Wi-Fi" : ""}.`}</p>
+      <p class="note">${P2P ? "You pick the genre and rules, then get a 4-letter code to send your partner. You can be in different rooms." : `You pick the genre and rules, then get a 4-letter code. Your partner joins with it on their phone${LOCAL ? " over your Wi-Fi" : ""}.`}</p>
       <button class="primary" id="goHost" ${online === false ? "disabled" : ""}>Create a room</button>
     </section>
     <section class="panel mode-card">
       <span class="label">${P2P ? "Joining someone?" : "Got a code?"}</span>
       <h2>Join a room</h2>
-      <div class="join-row${P2P ? " solo" : ""}">
-        <input type="text" id="joinCode" class="code-input" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" aria-label="Room code" value="${esc(st.joinCode || "")}" ${P2P ? "hidden" : ""}>
+      <div class="join-row">
+        <input type="text" id="joinCode" class="code-input" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" aria-label="Room code" value="${esc(st.joinCode || "")}">
         <input type="text" id="joinName" maxlength="20" placeholder="Your name" aria-label="Your name" value="${esc(st.myName || "")}">
       </div>
-      ${P2P ? `<p class="note">Stand next to the host. You'll scan a QR code on their phone.</p>` : ""}
-      <button class="primary" id="goJoin" ${online === false ? "disabled" : ""}>${P2P ? "Scan the host's code" : "Join"}</button>
+      <button class="primary" id="goJoin" ${online === false ? "disabled" : ""}>Join</button>
+      ${P2P ? `<p class="note">Next to each other? <button class="ghost" id="goScan">Scan their QR code instead</button></p>` : ""}
       <p class="error" id="joinErr"></p>
       ${LOCAL ? `<div class="lan-rooms">
         <span class="label">Rooms on this Wi-Fi</span>
@@ -1208,15 +1296,17 @@ function renderHome() {
   const go = async () => {
     const btn = document.getElementById("goJoin"); btn.disabled = true; btn.textContent = "Joining…"; $err.textContent = "";
     st.myName = $name.value; save();
-    if (P2P) {
-      btn.disabled = false; btn.textContent = "Scan the host's code";
-      if (!$name.value.trim()) { $err.textContent = "Add your name so the others know who's bidding."; return; }
-      return guestPair($name.value.trim());
-    }
-    await joinRoom($code.value, $name.value, $err);
+    if (P2P) await codeJoin($code.value, $name.value, $err);
+    else await joinRoom($code.value, $name.value, $err);
     if (S === st) { btn.disabled = false; btn.textContent = "Join"; }
   };
   document.getElementById("goJoin").onclick = go;
+  const scan = document.getElementById("goScan");
+  if (scan) scan.onclick = () => {
+    st.myName = $name.value; save();
+    if (!$name.value.trim()) { $err.textContent = "Add your name so the others know who's bidding."; return; }
+    guestPair($name.value.trim());
+  };
   [$code, $name].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") go(); }));
 }
 
@@ -1388,15 +1478,21 @@ function p2pPanel(compact) {
   const amHost = S.host === ME;
   const others = S.members ? S.members.length - 1 : 0;
   if (amHost) {
-    const status = n ? `${n} phone${n > 1 ? "s" : ""} connected` : "No phones connected";
-    return `<span class="conn ${n ? "ok" : "off"}">${status}</span> <button class="${compact ? "ghost" : "primary"} pair-btn" data-pair="host">${n && others ? "Pair another phone" : "Pair a phone"}</button>`;
+    const status = n ? `${n} phone${n > 1 ? "s" : ""} connected` : hostOnline() ? "Waiting for phones to join with the code" : "Opening the room…";
+    return `<span class="conn ${n ? "ok" : "off"}">${status}</span> <button class="ghost pair-btn" data-pair="host">Pair by QR code instead</button>`;
   }
   return n ? `<span class="conn ok">Connected to the host</span>`
-    : `<span class="conn off">Not connected</span> <button class="${compact ? "ghost" : "primary"} pair-btn" data-pair="guest">Reconnect</button>`;
+    : `<span class="conn off">Not connected</span> <button class="${compact ? "ghost" : "primary"} pair-btn" data-pair="rejoin">Reconnect</button> <button class="ghost pair-btn" data-pair="guest">Scan QR instead</button>`;
 }
 function wireP2pPanel() {
   $app.querySelectorAll("[data-pair]").forEach(b => b.onclick = () => {
     if (b.dataset.pair === "host") hostPair();
+    else if (b.dataset.pair === "rejoin") {
+      const me = (S.members || []).find(m => m.id === ME);
+      b.disabled = true; b.textContent = "Reconnecting…";
+      const $e = document.createElement("p");
+      codeJoin(S.code, me ? me.name : ((load() || {}).myName || "Player"), $e).then(() => { if ($e.textContent) toast($e.textContent); render(); });
+    }
     else { const me = (S.members || []).find(m => m.id === ME); guestPair(me ? me.name : (load() || {}).myName || "Player"); }
   });
 }
@@ -1428,7 +1524,7 @@ function renderLobby() {
       <button class="ghost" id="copyCode">Copy code</button>
     </div>
     ${P2P ? p2pPanel() : ""}
-    <p class="note" ${P2P ? "hidden" : ""}>${LOCAL && lanAddress() ? `On the other phone, open <b class="mono">${esc(lanAddress())}</b> on the same Wi-Fi and tap this room.` : `On the other phone, open this same game, tap <b>Join a room</b> and type the code.`}</p>
+    <p class="note">${LOCAL && lanAddress() ? `On the other phone, open <b class="mono">${esc(lanAddress())}</b> on the same Wi-Fi and tap this room.` : `On the other phone, open this same game, tap <b>Join a room</b> and type the code.`}</p>
     <div class="field-row">
       <span class="label">In the room · ${S.members.length} of 6</span>
       <div class="in-room">
@@ -1735,7 +1831,16 @@ function start(data) {
   const room = (data && data.room) || lsGet(ROOM_KEY);
   getDb().then(db => { dbAvailable = !!db; if (S && S.phase === "home") render(); });
   if (LOCAL) { pollLan(); setInterval(() => { if (S && (S.phase === "home" || S.phase === "lobby")) pollLan(); }, 2000); }
-  if (room) { S = { phase: "connecting", code: room }; enterRoom(room); return; }
+  if (room) {
+    S = { phase: "connecting", code: room }; enterRoom(room);
+    if (P2P) setTimeout(() => {
+      if (!NET || NET.code !== room || !S || !S.host || S.host === ME || connectedPeers().length) return;
+      const me = (S.members || []).find(m => m.id === ME);
+      const $e = document.createElement("p");
+      codeJoin(room, me ? me.name : ((load() || {}).myName || "Player"), $e).then(() => { if ($e.textContent) render(); });
+    }, 300);
+    return;
+  }
   const restored = (data && data.S) || load();
   const ok = restored && ["home", "setup", "reveal", "auction", "sold", "end"].includes(restored.phase) && (restored.phase === "home" || restored.phase === "setup" || restored.players);
   S = ok ? restored : defaultSetup();
