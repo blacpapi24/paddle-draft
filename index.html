@@ -193,6 +193,20 @@ textarea { min-height: 140px; resize: vertical; }
 .winby button { border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 14px; cursor: pointer; min-height: 40px; }
 .winby button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
 .genre-tabs { margin-bottom: 4px; }
+.trivia { display: grid; gap: 14px; border-top: 4px solid var(--pc); }
+.trivia h2 { font-size: 24px; }
+.trivia .q { font-family: var(--f-display); font-size: clamp(20px, 4vw, 26px); font-weight: 700; margin: 0; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.opt { text-align: left; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 14px; padding: 14px; display: grid; gap: 4px; min-height: 64px; }
+.opt:not(:disabled):hover { border-color: var(--muted); }
+.opt:disabled { cursor: default; }
+.opt strong { font-family: var(--f-display); font-size: 17px; }
+.opt span { font-size: 12.5px; color: var(--muted); }
+.opt.right { border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
+.opt.wrong { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); opacity: .8; }
+.result-line { margin: 0; font-size: 16px; }
+.result-line.good { color: var(--good); }
+.result-line.bad { color: var(--ink); }
 .rules-box { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 12px; }
 .lot-stat { margin-top: 10px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .lot-stat b { font-size: 15px; }
@@ -977,7 +991,7 @@ let dbAvailable = null; // null = still checking
 
 function defaultSetup() {
   return { phase: "home", mode: "local", names: ["Player 1", "Player 2"], myName: "", genreId: "films-2020s", custom: "",
-    customName: "", customStat: "", budget: 20, slots: 5, reserve: true, secondChance: true, showStats: false, winBy: null, lowest: false };
+    customName: "", customStat: "", budget: 20, slots: 5, reserve: true, secondChance: true, showStats: false, winBy: null, lowest: false, trivia: true };
 }
 function save() { if (NET) return; try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
 function load() { try { const r = localStorage.getItem(STORE_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
@@ -1118,8 +1132,401 @@ function hammer(winner) {
 function nextLot() {
   S.pos++;
   S.lastSold = null;
-  if (S.pos >= S.queue.length || !S.players.some(canStillBuy)) { S.phase = "end"; S.lot = null; return; }
+  if (S.pos >= S.queue.length || !S.players.some(canStillBuy)) {
+    S.lot = null;
+    S.phase = S.setup && S.setup.trivia !== false && setupTrivia() ? "trivia" : "end";
+    return;
+  }
   S.phase = "reveal";
+}
+
+/* ---------------- trivia trade ---------------- */
+// When the draft ends, one random player gets a multiple-choice quiz question
+// about the genre. A right answer lets them swap one of their
+// picks for one of another player's.
+// Quiz questions for the trivia trade, by genre: [question, right answer, wrong, wrong, wrong].
+const TRIVIA = {
+  "films-2020s": [
+    ["Who directed Oppenheimer?", "Christopher Nolan", "Denis Villeneuve", "Greta Gerwig", "Steven Spielberg"],
+    ["Who plays Barbie in Barbie (2023)?", "Margot Robbie", "Emma Stone", "Florence Pugh", "Anya Taylor-Joy"],
+    ["Who plays Paul Atreides in Dune?", "Timothée Chalamet", "Austin Butler", "Tom Holland", "Jacob Elordi"],
+    ["What is Maverick's real name in Top Gun: Maverick?", "Pete Mitchell", "Nick Bradshaw", "Tom Kazansky", "Jake Seresin"],
+    ["Who plays Bruce Wayne in The Batman (2022)?", "Robert Pattinson", "Ben Affleck", "Christian Bale", "Michael Keaton"],
+    ["Which new emotion takes over in Inside Out 2?", "Anxiety", "Pride", "Guilt", "Hope"],
+    ["Who won Best Actress for Poor Things?", "Emma Stone", "Margot Robbie", "Lily Gladstone", "Sandra Hüller"],
+    ["How many Spider-Men team up in Spider-Man: No Way Home?", "Three", "Two", "Four", "Five"],
+  ],
+  "films-2010s": [
+    ["Which was the first non-English film to win Best Picture?", "Parasite", "Roma", "Amélie", "Crouching Tiger, Hidden Dragon"],
+    ["Who directed Get Out?", "Jordan Peele", "Ari Aster", "Barry Jenkins", "Damien Chazelle"],
+    ["What is Cobb's totem in Inception?", "A spinning top", "A loaded die", "A chess piece", "A poker chip"],
+    ["Which film was wrongly announced as Best Picture instead of Moonlight?", "La La Land", "Hidden Figures", "Arrival", "Manchester by the Sea"],
+    ["Who plays the drum teacher Fletcher in Whiplash?", "J.K. Simmons", "Bryan Cranston", "Ed Harris", "Miles Teller"],
+    ["Who plays Mark Zuckerberg in The Social Network?", "Jesse Eisenberg", "Andrew Garfield", "Michael Cera", "Justin Timberlake"],
+    ["What is the name of Cooper's daughter in Interstellar?", "Murph", "Amelia", "Lucy", "Grace"],
+    ["Who plays Furiosa in Mad Max: Fury Road?", "Charlize Theron", "Zoë Kravitz", "Anya Taylor-Joy", "Rosie Huntington-Whiteley"],
+  ],
+  "films-2000s": [
+    ["Who played the Joker in The Dark Knight?", "Heath Ledger", "Jared Leto", "Jack Nicholson", "Joaquin Phoenix"],
+    ["Which studio made Spirited Away?", "Studio Ghibli", "Pixar", "Toei Animation", "DreamWorks"],
+    ["What is Russell Crowe's character called in Gladiator?", "Maximus", "Commodus", "Spartacus", "Lucius"],
+    ["What kind of fish is Dory in Finding Nemo?", "Blue tang", "Clownfish", "Angelfish", "Pufferfish"],
+    ["Who directed Inglourious Basterds?", "Quentin Tarantino", "Guy Ritchie", "Martin Scorsese", "The Coen brothers"],
+    ["The Departed is a remake of which film?", "Infernal Affairs", "Oldboy", "Hard Boiled", "The Raid"],
+    ["How many Oscars did The Return of the King win?", "11", "7", "9", "13"],
+    ["Who plays Daniel Plainview in There Will Be Blood?", "Daniel Day-Lewis", "Javier Bardem", "Russell Crowe", "Sean Penn"],
+  ],
+  "films-1990s": [
+    ["Who directed Titanic?", "James Cameron", "Steven Spielberg", "Ridley Scott", "Robert Zemeckis"],
+    ["In Jurassic Park, which animal's DNA fills the gaps in the dinosaur DNA?", "Frog", "Lizard", "Bird", "Crocodile"],
+    ["Finish the quote: \"Life is like a box of...\"", "Chocolates", "Surprises", "Tricks", "Memories"],
+    ["Which pill does Neo take in The Matrix?", "The red pill", "The blue pill", "Both", "Neither"],
+    ["Who plays Red in The Shawshank Redemption?", "Morgan Freeman", "Denzel Washington", "Samuel L. Jackson", "Danny Glover"],
+    ["Where is the family flying to in Home Alone?", "Paris", "London", "Rome", "Florida"],
+    ["What is Will Smith's agent name in Men in Black?", "Agent J", "Agent K", "Agent M", "Agent Z"],
+    ["Who plays Hannibal Lecter in The Silence of the Lambs?", "Anthony Hopkins", "Gary Oldman", "Jeremy Irons", "Ralph Fiennes"],
+    ["In Pulp Fiction, where do Vincent and Mia enter the twist contest?", "Jack Rabbit Slim's", "Big Kahuna Burger", "Monster Joe's", "The Bonnie Situation"],
+  ],
+  pixar: [
+    ["What was Pixar's first feature film?", "Toy Story", "A Bug's Life", "Monsters, Inc.", "Finding Nemo"],
+    ["Who voices Woody in Toy Story?", "Tom Hanks", "Tim Allen", "Billy Crystal", "John Goodman"],
+    ["What is the little girl called in Monsters, Inc.?", "Boo", "Riley", "Molly", "Dot"],
+    ["Which robot does WALL-E fall for?", "EVE", "MO", "AUTO", "BURN-E"],
+    ["What is the rat's name in Ratatouille?", "Remy", "Emile", "Linguini", "Gusteau"],
+    ["Which festival is at the heart of Coco?", "Day of the Dead", "Carnival", "Cinco de Mayo", "Christmas"],
+    ["Who designs the supersuits in The Incredibles?", "Edna Mode", "Mirage", "Frozone", "Evelyn Deavor"],
+    ["What is Riley's imaginary friend called in Inside Out?", "Bing Bong", "Bonnie", "Bob", "Bingo"],
+    ["What lifts Carl's house into the sky in Up?", "Balloons", "A blimp", "Kites", "A rocket"],
+  ],
+  disney: [
+    ["What is the snowman called in Frozen?", "Olaf", "Sven", "Kristoff", "Marshmallow"],
+    ["Which demigod helps Moana?", "Maui", "Tamatoa", "Te Kā", "Hei Hei"],
+    ["What kind of animal is Judy Hopps in Zootopia?", "A rabbit", "A fox", "A sheep", "A cat"],
+    ["Which princess is the star of Tangled?", "Rapunzel", "Aurora", "Merida", "Belle"],
+    ["\"We Don't Talk About...\" who, in Encanto?", "Bruno", "Mirabel", "Camilo", "Antonio"],
+    ["Who is Simba's father in The Lion King?", "Mufasa", "Scar", "Rafiki", "Zazu"],
+    ["Who voiced the Genie in Aladdin (1992)?", "Robin Williams", "Will Smith", "Eddie Murphy", "Jim Carrey"],
+    ["What is the robot called in Big Hero 6?", "Baymax", "Fred", "Wasabi", "Yokai"],
+    ["What is the candlestick called in Beauty and the Beast?", "Lumière", "Cogsworth", "Chip", "Gaston"],
+  ],
+  marvel: [
+    ["Which film started the Marvel Cinematic Universe?", "Iron Man", "The Incredible Hulk", "Thor", "Captain America: The First Avenger"],
+    ["What is the rare metal found in Wakanda?", "Vibranium", "Adamantium", "Uru", "Tritanium"],
+    ["How many Infinity Stones does Thanos collect?", "Six", "Five", "Seven", "Four"],
+    ["What is the name of Thor's hammer?", "Mjolnir", "Stormbreaker", "Gungnir", "Jarnbjorn"],
+    ["What is Black Panther's real name?", "T'Challa", "M'Baku", "N'Jadaka", "T'Chaka"],
+    ["Who plays Doctor Strange?", "Benedict Cumberbatch", "Tom Hiddleston", "Paul Bettany", "Chiwetel Ejiofor"],
+    ["What is Captain America's real name?", "Steve Rogers", "Bucky Barnes", "Sam Wilson", "Peter Parker"],
+    ["Which Guardian can only say \"I am Groot\"?", "Groot", "Rocket", "Drax", "Mantis"],
+  ],
+  horror: [
+    ["What is the clown called in It?", "Pennywise", "Twisty", "Captain Spaulding", "Art"],
+    ["What is the town called in Jaws?", "Amity Island", "Haddonfield", "Derry", "Crystal Lake"],
+    ["What is the masked killer called in Scream?", "Ghostface", "Jigsaw", "Leatherface", "The Shape"],
+    ["What is the puppet called in Saw?", "Billy", "Chucky", "Slappy", "Annabelle"],
+    ["Finish the line from The Sixth Sense: \"I see...\"", "Dead people", "Ghosts", "Things", "Shadows"],
+    ["Who is the masked killer in Halloween?", "Michael Myers", "Jason Voorhees", "Freddy Krueger", "Norman Bates"],
+    ["What do the creatures hunt by in A Quiet Place?", "Sound", "Smell", "Sight", "Heat"],
+    ["Which real-life investigators are the heroes of The Conjuring?", "Ed and Lorraine Warren", "Fox Mulder and Dana Scully", "Sam and Dean Winchester", "Hans Holzer and his wife"],
+    ["What is the possessed girl called in The Exorcist?", "Regan", "Carrie", "Samara", "Annie"],
+  ],
+  celebs: [
+    ["Which island was Cristiano Ronaldo born on?", "Madeira", "Sardinia", "Mallorca", "Tenerife"],
+    ["What is Dwayne Johnson's wrestling name?", "The Rock", "The Undertaker", "Stone Cold", "The Big Show"],
+    ["What is Selena Gomez's beauty brand called?", "Rare Beauty", "Fenty Beauty", "Kylie Cosmetics", "r.e.m. beauty"],
+    ["What is Kim Kardashian's shapewear brand called?", "Skims", "Spanx", "Savage X Fenty", "Good American"],
+    ["Which group was Beyoncé in before going solo?", "Destiny's Child", "TLC", "En Vogue", "Spice Girls"],
+    ["Where was Justin Bieber discovered?", "YouTube", "MySpace", "American Idol", "The X Factor"],
+    ["Which character does Ariana Grande play in Wicked?", "Glinda", "Elphaba", "Nessarose", "Madame Morrible"],
+    ["Which club did Lionel Messi start his professional career at?", "Barcelona", "Newell's Old Boys", "PSG", "River Plate"],
+    ["What was the Kardashians' first reality show called?", "Keeping Up with the Kardashians", "The Kardashians", "Kourtney and Kim Take Miami", "The Simple Life"],
+  ],
+  popstars: [
+    ["What is Taylor Swift's record-breaking tour called?", "The Eras Tour", "The Reputation Tour", "The 1989 World Tour", "The Lover Tour"],
+    ["Which country is Rihanna from?", "Barbados", "Jamaica", "Trinidad and Tobago", "The Bahamas"],
+    ["Which city is Drake from?", "Toronto", "Atlanta", "Houston", "Detroit"],
+    ["Bruno Mars and Anderson .Paak make music together as...?", "Silk Sonic", "Silk City", "Daft Punk", "Gnarls Barkley"],
+    ["What are Adele's album titles named after?", "Her age", "Her address", "Her birthday", "Her shoe size"],
+    ["What is The Weeknd's real first name?", "Abel", "Aubrey", "Austin", "Abraham"],
+    ["Who is Billie Eilish's brother and producer?", "Finneas", "Jack Antonoff", "Max Martin", "Mark Ronson"],
+    ["Which of these is NOT an Ed Sheeran album title?", "%", "+", "×", "÷"],
+    ["Ariana Grande: \"Thank U, ...\"", "Next", "Bye", "Again", "Babe"],
+  ],
+  tv: [
+    ["What alias does Walter White use in Breaking Bad?", "Heisenberg", "Gus", "Saul", "Hank"],
+    ["What's Tony Soprano's cover job?", "Waste management", "Construction", "Car sales", "A butcher's"],
+    ["Which city is The Wire set in?", "Baltimore", "Chicago", "Philadelphia", "Detroit"],
+    ["What is Jon Snow's direwolf called in Game of Thrones?", "Ghost", "Nymeria", "Summer", "Grey Wind"],
+    ["What is the family called in Succession?", "Roy", "Pierce", "Murdoch", "Logan"],
+    ["What is Saul Goodman's real name?", "Jimmy McGill", "Chuck McGill", "Howard Hamlin", "Mike Ehrmantraut"],
+    ["Which town is Stranger Things set in?", "Hawkins", "Derry", "Twin Peaks", "Riverdale"],
+    ["What is the paper company in The Office (US)?", "Dunder Mifflin", "Wernham Hogg", "Sabre", "Staples"],
+    ["What is the theme of Fleabag's café?", "Guinea pigs", "Cats", "Rabbits", "Owls"],
+  ],
+  sitcoms: [
+    ["What is the coffee shop called in Friends?", "Central Perk", "Monk's Café", "MacLaren's", "Luke's"],
+    ["What is Kramer's first name in Seinfeld?", "Cosmo", "George", "Newman", "Jerry"],
+    ["Who is the captain in Brooklyn Nine-Nine?", "Raymond Holt", "Terry Jeffords", "Jake Peralta", "Charles Boyle"],
+    ["Which town is Parks and Recreation set in?", "Pawnee", "Scranton", "Springfield", "Eagleton"],
+    ["What is Sheldon's catchphrase in The Big Bang Theory?", "Bazinga!", "Legendary!", "Cowabunga!", "Noice!"],
+    ["Which catchphrase belongs to Barney in How I Met Your Mother?", "Suit up!", "How you doin'?", "Cool cool cool", "Treat yo self!"],
+    ["Where did Will grow up, according to The Fresh Prince theme?", "West Philadelphia", "East Los Angeles", "South Chicago", "North Baltimore"],
+    ["What is Del Boy's company called in Only Fools and Horses?", "Trotters Independent Traders", "Peckham Imports", "Nag's Head Supplies", "Reliant Robin Ltd"],
+    ["What is Ross's pet monkey called in Friends?", "Marcel", "Mojo", "Bubbles", "Abu"],
+  ],
+  netflix: [
+    ["What is the first game in Squid Game?", "Red Light, Green Light", "Tug of war", "Marbles", "Glass bridge"],
+    ["Which school does Wednesday Addams go to?", "Nevermore Academy", "Hogwarts", "Hawkins High", "Crestwood School"],
+    ["What is Eleven's favourite food in Stranger Things?", "Eggo waffles", "Pancakes", "Pizza", "Chocolate pudding"],
+    ["Who played the Queen in the first two seasons of The Crown?", "Claire Foy", "Olivia Colman", "Imelda Staunton", "Helen Mirren"],
+    ["Who writes the gossip sheet in Bridgerton?", "Lady Whistledown", "Lady Danbury", "Gossip Girl", "Lady Featherington"],
+    ["What is the mastermind called in Money Heist?", "The Professor", "Berlin", "Tokyo", "The Doctor"],
+    ["Who plays Marty Byrde in Ozark?", "Jason Bateman", "Jon Hamm", "Bryan Cranston", "Matthew McConaughey"],
+    ["Who played Geralt in the first seasons of The Witcher?", "Henry Cavill", "Liam Hemsworth", "Jason Momoa", "Tom Hardy"],
+    ["Which Colombian city is Pablo Escobar's base in Narcos?", "Medellín", "Bogotá", "Cali", "Cartagena"],
+    ["Who created Black Mirror?", "Charlie Brooker", "Steven Moffat", "Jesse Armstrong", "Russell T Davies"],
+  ],
+  "british-tv": [
+    ["Which city is Peaky Blinders set in?", "Birmingham", "Manchester", "Liverpool", "Leeds"],
+    ["What is the anti-corruption unit called in Line of Duty?", "AC-12", "CTU", "MI5", "Section 8"],
+    ["Who plays Dr Watson in Sherlock?", "Martin Freeman", "Andrew Scott", "Rupert Graves", "Mark Gatiss"],
+    ["Which town in Wales is Stacey from in Gavin & Stacey?", "Barry", "Cardiff", "Swansea", "Newport"],
+    ["What is the paper company called in The Office (UK)?", "Wernham Hogg", "Dunder Mifflin", "Swindon Paper", "Slough Supplies"],
+    ["What is the family called in Downton Abbey?", "Crawley", "Bellamy", "Grantham", "Bridgerton"],
+    ["Who plays DCI John Luther?", "Idris Elba", "David Oyelowo", "Chiwetel Ejiofor", "Ashley Walters"],
+    ["What is the estate called in Top Boy?", "Summerhouse", "Peckham", "Harlem Heights", "Broadwater Farm"],
+    ["Which city is Skins set in?", "Bristol", "Manchester", "Brighton", "Leeds"],
+    ["Who created and stars in Fleabag?", "Phoebe Waller-Bridge", "Michaela Coel", "Jodie Comer", "Olivia Colman"],
+  ],
+  "albums-2010s": [
+    ["Who made To Pimp a Butterfly?", "Kendrick Lamar", "J. Cole", "Kanye West", "Childish Gambino"],
+    ["Which Daft Punk single features Pharrell Williams?", "Get Lucky", "One More Time", "Around the World", "Harder, Better, Faster, Stronger"],
+    ["Which city are the Arctic Monkeys from?", "Sheffield", "Manchester", "Leeds", "Liverpool"],
+    ["What was the first single from Adele's 21?", "Rolling in the Deep", "Someone Like You", "Set Fire to the Rain", "Hello"],
+    ["Who is the main person behind Tame Impala?", "Kevin Parker", "Matt Bellamy", "Alex Turner", "Thom Yorke"],
+    ["Which song is on Beyoncé's Lemonade?", "Formation", "Halo", "Crazy in Love", "Drunk in Love"],
+    ["Which song is on My Beautiful Dark Twisted Fantasy?", "Runaway", "Stronger", "Gold Digger", "Heartless"],
+    ["How is Blonde's title spelled on the album cover?", "Blond", "Blonde", "BLONDE", "Blon_d"],
+  ],
+  "songs-2000s": [
+    ["Mr. Brightside: \"Coming out of my...\"", "Cage", "Mind", "Shell", "Head"],
+    ["Hey Ya!: \"Shake it like a...\"", "Polaroid picture", "Salt shaker", "Tambourine", "Maraca"],
+    ["Who features on Rihanna's Umbrella?", "Jay-Z", "Kanye West", "Drake", "Ne-Yo"],
+    ["Who is the other half of The White Stripes with Jack White?", "Meg White", "Karen O", "Alison Mosshart", "Kim Gordon"],
+    ["Rehab: \"They tried to make me go to rehab, I said...\"", "No, no, no", "Yes, yes, yes", "Not today", "Never again"],
+    ["Single Ladies: \"If you liked it then you should've put a...\"", "Ring on it", "Bow on it", "Price on it", "Lock on it"],
+    ["Which talent show did Kelly Clarkson win?", "American Idol", "The X Factor", "The Voice", "Pop Idol"],
+    ["What was Britney Spears' debut single?", "...Baby One More Time", "Oops!... I Did It Again", "Toxic", "Lucky"],
+    ["Who produced 50 Cent's In da Club?", "Dr. Dre", "Timbaland", "The Neptunes", "Kanye West"],
+  ],
+  paramore: [
+    ["Which Paramore song is on the Twilight soundtrack?", "Decode", "Misery Business", "Ignorance", "Brick by Boring Brick"],
+    ["Which state did Paramore form in?", "Tennessee", "Florida", "California", "Texas"],
+    ["Which album is Misery Business on?", "Riot!", "Brand New Eyes", "After Laughter", "All We Know Is Falling"],
+    ["Which album is Still into You on?", "Paramore", "Riot!", "This Is Why", "After Laughter"],
+    ["Which album is Hard Times on?", "After Laughter", "This Is Why", "Brand New Eyes", "Paramore"],
+    ["Which song won Paramore their first Grammy?", "Ain't It Fun", "Still into You", "The Only Exception", "Hard Times"],
+    ["What was Paramore's 2023 album called?", "This Is Why", "After Laughter", "Petals for Armor", "Running Out of Time"],
+    ["Who is Paramore's guitarist?", "Taylor York", "Zac Farro", "Josh Farro", "Jeremy Davis"],
+  ],
+  hayley: [
+    ["What was Hayley Williams' first solo album?", "Petals for Armor", "Flowers for Vases / descansos", "Ego Death at a Bachelorette Party", "After Laughter"],
+    ["Which album is Simmer on?", "Petals for Armor", "Flowers for Vases / descansos", "This Is Why", "Riot!"],
+    ["What is Hayley's hair dye brand called?", "Good Dye Young", "Manic Panic", "Arctic Fox", "Hayley Hues"],
+    ["Which B.o.B song features Hayley Williams?", "Airplanes", "Nothin' on You", "Magic", "Strange Clouds"],
+    ["Which Zedd song features Hayley Williams?", "Stay the Night", "Clarity", "The Middle", "Beautiful Now"],
+    ["Which band does Hayley Williams front?", "Paramore", "Tonight Alive", "Flyleaf", "Evanescence"],
+    ["What was Hayley's 2021 solo album called?", "Flowers for Vases / descansos", "Petals for Armor", "This Is Why", "Ego Death at a Bachelorette Party"],
+  ],
+  "games-2010s": [
+    ["What is the name of Arthur Morgan's gang in Red Dead Redemption 2?", "The Van der Linde gang", "The O'Driscoll Boys", "The Lemoyne Raiders", "The Pinkertons"],
+    ["Who is the hero of The Witcher 3?", "Geralt of Rivia", "Ciri", "Yennefer", "Dandelion"],
+    ["What are you called in Skyrim?", "The Dragonborn", "The Hero of Kvatch", "The Nerevarine", "The Sole Survivor"],
+    ["Which Minecraft mob explodes?", "Creeper", "Enderman", "Zombie", "Skeleton"],
+    ["Which city is Grand Theft Auto V set in?", "Los Santos", "Liberty City", "Vice City", "San Fierro"],
+    ["What is the villainous AI called in Portal 2?", "GLaDOS", "SHODAN", "Cortana", "HAL"],
+    ["What is Kratos's son called in God of War (2018)?", "Atreus", "Baldur", "Mimir", "Thor"],
+    ["What was Super Smash Bros. Ultimate's big tagline?", "Everyone is here!", "Let's-a go!", "It's on like Donkey Kong!", "Finish him!"],
+    ["Which land is Breath of the Wild set in?", "Hyrule", "Termina", "Koholint", "Lorule"],
+  ],
+  consoles: [
+    ["Which company makes the Xbox?", "Microsoft", "Sony", "Nintendo", "Sega"],
+    ["Which game came bundled with the original Game Boy?", "Tetris", "Super Mario Land", "Pokémon Red", "Kirby's Dream Land"],
+    ["What does \"DS\" stand for in Nintendo DS?", "Dual Screen", "Double Speed", "Digital System", "Developer's System"],
+    ["What are the Switch's detachable controllers called?", "Joy-Con", "Wiimotes", "DualShock", "Pro Pads"],
+    ["What did players call the Xbox 360's famous fault?", "The Red Ring of Death", "The Blue Screen of Death", "The Yellow Light of Death", "The Black Box"],
+    ["What is the PlayStation 5 controller called?", "DualSense", "DualShock 5", "SixAxis", "PlayPad"],
+    ["The original PlayStation grew out of a cancelled deal with which company?", "Nintendo", "Sega", "Atari", "Philips"],
+    ["What is the Wii's motion controller called?", "Wii Remote", "Joy-Con", "Move", "Kinect"],
+  ],
+  "games-switch": [
+    ["Who runs the island in Animal Crossing: New Horizons?", "Tom Nook", "Isabelle", "K.K. Slider", "Blathers"],
+    ["What is Mario's hat companion called in Super Mario Odyssey?", "Cappy", "Hatty", "Toad", "Bowser Jr."],
+    ["Which region is Pokémon Scarlet and Violet set in?", "Paldea", "Galar", "Kanto", "Hisui"],
+    ["Which region is Pokémon Sword and Shield set in?", "Galar", "Paldea", "Alola", "Kalos"],
+    ["Which power lets Link build vehicles in Tears of the Kingdom?", "Ultrahand", "Magnesis", "Recall", "Stasis"],
+    ["What sets off the wild effects in Super Mario Bros. Wonder?", "Wonder Flowers", "Super Stars", "Power Moons", "Fire Flowers"],
+    ["Who created Super Smash Bros.?", "Masahiro Sakurai", "Shigeru Miyamoto", "Hideo Kojima", "Satoru Iwata"],
+    ["Who is the main villain of Breath of the Wild?", "Calamity Ganon", "Bowser", "Majora", "Ghirahim"],
+  ],
+  "games-2020s": [
+    ["Which author helped write the world of Elden Ring?", "George R. R. Martin", "J. K. Rowling", "Neil Gaiman", "Stephen King"],
+    ["Which tabletop game is Baldur's Gate 3 based on?", "Dungeons & Dragons", "Warhammer", "Pathfinder", "Magic: The Gathering"],
+    ["Which century is Hogwarts Legacy set in?", "The 1800s", "The 1600s", "The 1990s", "The 1700s"],
+    ["Which city is Cyberpunk 2077 set in?", "Night City", "Neo Tokyo", "Rapture", "Midgar"],
+    ["Which mythology is God of War Ragnarök based on?", "Norse", "Greek", "Egyptian", "Japanese"],
+    ["Which console is Astro Bot on?", "PlayStation 5", "Nintendo Switch", "Xbox Series X", "PlayStation 4"],
+    ["Who is invading the island in Ghost of Tsushima?", "The Mongols", "The Vikings", "The Romans", "The Dutch"],
+    ["Which planet do you fight for in Helldivers 2?", "Super Earth", "Mars", "Reach", "Pandora"],
+    ["Which giant vampire lady became famous from Resident Evil Village?", "Lady Dimitrescu", "Lady Gaga", "Mother Miranda", "Donna Beneviento"],
+    ["Which two Spider-Men can you play in Marvel's Spider-Man 2?", "Peter Parker and Miles Morales", "Peter Parker and Miguel O'Hara", "Miles Morales and Gwen Stacy", "Peter Parker and Ben Reilly"],
+  ],
+  countries: [
+    ["What is the capital of Brazil?", "Brasília", "Rio de Janeiro", "São Paulo", "Salvador"],
+    ["What is the capital of Nigeria?", "Abuja", "Lagos", "Kano", "Ibadan"],
+    ["What is the capital of Pakistan?", "Islamabad", "Karachi", "Lahore", "Peshawar"],
+    ["What is the capital of Bangladesh?", "Dhaka", "Chittagong", "Kolkata", "Sylhet"],
+    ["Which country's currency is the naira?", "Nigeria", "Indonesia", "India", "Bangladesh"],
+    ["Which country hosted the 2008 Summer Olympics?", "China", "Russia", "Brazil", "India"],
+    ["Which country is home to Bollywood?", "India", "Pakistan", "Bangladesh", "Indonesia"],
+    ["Which country's currency is the real?", "Brazil", "Mexico", "Russia", "Indonesia"],
+    ["What is the capital of Mexico?", "Mexico City", "Guadalajara", "Cancún", "Monterrey"],
+  ],
+  "pl-legends": [
+    ["Which shirt number did Thierry Henry wear at Arsenal?", "14", "9", "10", "12"],
+    ["Which club did Alan Shearer captain?", "Newcastle United", "Blackburn Rovers", "Southampton", "Leeds United"],
+    ["Which is the only English club Steven Gerrard played for?", "Liverpool", "Everton", "Chelsea", "Aston Villa"],
+    ["Which country did Didier Drogba play for?", "Ivory Coast", "Ghana", "Cameroon", "Senegal"],
+    ["Which country did Ryan Giggs play for?", "Wales", "England", "Scotland", "Northern Ireland"],
+    ["Which country does Kevin De Bruyne play for?", "Belgium", "Netherlands", "Germany", "Denmark"],
+    ["What do fans call Mohamed Salah?", "The Egyptian King", "The Pharaoh", "Mo Money", "The Nile Express"],
+    ["Which club did Cristiano Ronaldo join Manchester United from?", "Sporting CP", "Benfica", "Porto", "Real Madrid"],
+    ["Which club did Wayne Rooney start at?", "Everton", "Manchester United", "Liverpool", "Derby County"],
+  ],
+  "pl-clubs": [
+    ["Which club is nicknamed the Toffees?", "Everton", "Liverpool", "Aston Villa", "West Ham"],
+    ["Which club is nicknamed the Magpies?", "Newcastle United", "Tottenham Hotspur", "Chelsea", "Manchester City"],
+    ["Which club is nicknamed the Hammers?", "West Ham United", "Arsenal", "Everton", "Aston Villa"],
+    ["Which club plays at Stamford Bridge?", "Chelsea", "Fulham", "Arsenal", "Tottenham Hotspur"],
+    ["Who won the first Premier League title, in 1992-93?", "Manchester United", "Blackburn Rovers", "Arsenal", "Liverpool"],
+    ["Which club went a whole Premier League season unbeaten in 2003-04?", "Arsenal", "Chelsea", "Manchester United", "Liverpool"],
+    ["Which club's anthem is \"You'll Never Walk Alone\"?", "Liverpool", "Everton", "Manchester United", "Newcastle United"],
+    ["Which club is nicknamed the Gunners?", "Arsenal", "West Ham United", "Chelsea", "Aston Villa"],
+  ],
+  "fast-food": [
+    ["Who founded KFC?", "Colonel Harland Sanders", "Ray Kroc", "Dave Thomas", "Glen Bell"],
+    ["What is Burger King's signature burger?", "The Whopper", "The Big Mac", "The Baconator", "The Big Tasty"],
+    ["Which country does Nando's come from?", "South Africa", "Portugal", "Brazil", "Mozambique"],
+    ["What is Greggs most famous for?", "Sausage rolls", "Fish and chips", "Kebabs", "Fried chicken"],
+    ["What can you snack on for free while you wait at Five Guys?", "Peanuts", "Popcorn", "Crisps", "Pickles"],
+    ["What does Subway call its long sub?", "Footlong", "Six-incher", "Mega Sub", "Yardstick"],
+    ["What is Taco Bell's slogan?", "Live Más", "I'm Lovin' It", "Have It Your Way", "Finger Lickin' Good"],
+    ["How many dots are on the Domino's logo?", "Three", "Two", "Four", "Six"],
+    ["Which clown is McDonald's mascot?", "Ronald McDonald", "Krusty", "Bozo", "Pennywise"],
+  ],
+};
+function makeQuestion() {
+  const bank = TRIVIA[S.setup.genreId];
+  if (!bank || !bank.length) return null;
+  const [text, right, ...wrong] = bank[Math.floor(Math.random() * bank.length)];
+  const options = shuffle([right, ...wrong]).map(title => ({ title }));
+  return { text, options, answer: options.findIndex(o => o.title === right) };
+}
+function setupTrivia() {
+  const withPicks = S.players.map((p, i) => i).filter(i => S.players[i].picks.length);
+  if (withPicks.length < 2) return false;
+  const q = makeQuestion();
+  if (!q) return false;
+  S.trivia = { player: withPicks[Math.floor(Math.random() * withPicks.length)], q, chosen: null, stage: "ask", trade: null };
+  return true;
+}
+let tradeSel = { key: null, opp: null, take: null, give: null };
+function renderTrivia() {
+  const T = S.trivia, q = T.q, w = S.players[T.player];
+  const seat = mySeat(), local = !NET;
+  const mine = local || seat === T.player;
+  const key = T.player + "|" + q.text + "|" + q.options.map(o => o.title).join();
+  if (tradeSel.key !== key) tradeSel = { key, opp: null, take: null, give: null };
+  const answered = T.stage !== "ask";
+  const others = S.players.map((p, i) => i).filter(i => i !== T.player && S.players[i].picks.length);
+  if (tradeSel.opp == null && others.length === 1) tradeSel.opp = others[0];
+  const opp = tradeSel.opp != null ? S.players[tradeSel.opp] : null;
+  const showVals = S.showStats && S.stat;
+  const pickBtn = (k, attr, i, sel) => `<button type="button" ${attr}="${i}" aria-pressed="${sel === i}">${esc(k.title)}${showVals ? ` · ${fmtStat(k.value, S.stat.fmt)}` : ""}</button>`;
+  let body;
+  if (!answered) {
+    body = `<p class="note">${local ? `Pass the phone to <b>${esc(w.name)}</b>. ` : ""}Get it right and you can swap one of your picks for one of someone else's.</p>`;
+  } else if (T.stage === "lost") {
+    body = `<p class="result-line bad">Not quite. It was <b>${esc(q.options[q.answer].title)}</b>. No swap this time.</p>
+      <div class="actions"><button class="primary" id="toResults">See the results</button></div>`;
+  } else if (!mine) {
+    body = `<p class="result-line good">Correct! ${esc(w.name)} is picking a swap…</p>`;
+  } else {
+    const ready = opp && tradeSel.take != null && tradeSel.give != null;
+    body = `<p class="result-line good">Correct! You can swap one of your picks for one of someone else's.</p>
+      ${others.length > 1 ? `<div class="field-row"><span class="label">Swap with</span><div class="winby">${others.map(i => `<button type="button" data-opp="${i}" aria-pressed="${tradeSel.opp === i}">${esc(S.players[i].name)}</button>`).join("")}</div></div>` : ""}
+      ${opp ? `<div class="field-row"><span class="label">Take from ${esc(opp.name)}</span><div class="winby">${opp.picks.map((k, i) => pickBtn(k, "data-take", i, tradeSel.take)).join("")}</div></div>
+      <div class="field-row"><span class="label">Give them one of yours</span><div class="winby">${w.picks.map((k, i) => pickBtn(k, "data-give", i, tradeSel.give)).join("")}</div></div>` : ""}
+      <div class="actions">
+        <button class="primary" id="doSwap" ${ready ? "" : "disabled"}>${ready ? `Swap ${esc(w.picks[tradeSel.give].title)} for ${esc(opp.picks[tradeSel.take].title)}` : "Pick one of each to swap"}</button>
+        <button class="ghost" id="noSwap" style="padding:14px 18px">Keep my picks</button>
+      </div>`;
+  }
+  $app.innerHTML = `
+  <div class="wrap" style="gap:16px">
+    ${NET ? `<div class="room-bar"><span class="label">Room</span> <b class="mono">${esc(S.code)}</b>${P2P ? p2pPanel(true) : ""}</div>` : ""}
+    <section class="panel trivia" style="--pc:var(${w.color})">
+      <span class="label">Trivia trade · ${esc(S.genre)}</span>
+      <h2>${mine && !local ? "You've been picked!" : `${esc(w.name)}, this one's for you`}</h2>
+      <p class="q">${esc(q.text)}</p>
+      <div class="opts">
+        ${q.options.map((o, i) => {
+          const cls = answered ? (i === q.answer ? " right" : i === T.chosen ? " wrong" : "") : "";
+          return `<button class="opt${cls}" data-opt="${i}" ${answered || !mine ? "disabled" : ""}>
+            <strong>${esc(o.title)}</strong></button>`;
+        }).join("")}
+      </div>
+      ${!answered && !mine ? `<p class="note">Waiting for ${esc(w.name)} to answer…</p>` : ""}
+      ${body}
+    </section>
+    ${boardsHTML(false)}
+  </div>`;
+  if (P2P && NET) wireP2pPanel();
+  $app.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => {
+    const i = +b.dataset.opt;
+    act(() => { if (S.phase !== "trivia" || S.trivia.stage !== "ask" || (NET && mySeat() !== S.trivia.player)) return false;
+      S.trivia.chosen = i; S.trivia.stage = i === S.trivia.q.answer ? "won" : "lost"; });
+  });
+  $app.querySelectorAll("[data-opp]").forEach(b => b.onclick = () => { tradeSel.opp = +b.dataset.opp; tradeSel.take = null; render(); });
+  $app.querySelectorAll("[data-take]").forEach(b => b.onclick = () => { tradeSel.take = +b.dataset.take; render(); });
+  $app.querySelectorAll("[data-give]").forEach(b => b.onclick = () => { tradeSel.give = +b.dataset.give; render(); });
+  const tr = document.getElementById("toResults");
+  if (tr) tr.onclick = () => act(() => { if (S.phase !== "trivia") return false; S.phase = "end"; });
+  const ns = document.getElementById("noSwap");
+  if (ns) ns.onclick = () => act(() => { if (S.phase !== "trivia" || S.trivia.stage !== "won") return false; S.trivia.stage = "done"; S.phase = "end"; });
+  const ds = document.getElementById("doSwap");
+  if (ds) ds.onclick = () => {
+    const sel = { ...tradeSel };
+    act(() => {
+      const T2 = S.trivia;
+      if (S.phase !== "trivia" || T2.stage !== "won" || (NET && mySeat() !== T2.player)) return false;
+      const me = S.players[T2.player], them = S.players[sel.opp];
+      if (!them || !me.picks[sel.give] || !them.picks[sel.take]) return false;
+      const give = me.picks[sel.give], take = them.picks[sel.take];
+      me.picks[sel.give] = take; them.picks[sel.take] = give;
+      T2.trade = { from: sel.opp, took: take.title, gave: give.title };
+      T2.stage = "done"; S.phase = "end";
+    });
+  };
+}
+function triviaSummary() {
+  const T = S.trivia;
+  if (!T) return "";
+  const n = esc(S.players[T.player].name);
+  if (T.trade) return `Trivia trade: ${n} got it right and swapped ${esc(T.trade.gave)} for ${esc(S.players[T.trade.from].name)}'s ${esc(T.trade.took)}.`;
+  if (T.stage === "lost") return `Trivia trade: ${n} got the question wrong, so no swap.`;
+  if (T.stage === "done") return `Trivia trade: ${n} got it right but kept their picks.`;
+  return "";
 }
 
 /* ---------------- actions: local or online ---------------- */
@@ -1266,6 +1673,7 @@ function render() {
   if (S.phase === "connecting") return renderConnecting();
   if (S.phase === "lobby") return renderLobby();
   if (S.phase === "end") return renderEnd();
+  if (S.phase === "trivia") return renderTrivia();
   renderTable();
 }
 
@@ -1392,6 +1800,8 @@ function rulesHTML(su) {
         <span>If nobody bids on a lot, it goes to the back of the pile for one more go.</span></label>
       <label class="check"><input type="checkbox" id="showStats" ${su.showStats ? "checked" : ""}>
         <span>Show each lot's stat while bidding. Leave this off to keep the numbers secret until the final reveal.</span></label>
+      <label class="check"><input type="checkbox" id="trivia" ${su.trivia !== false ? "checked" : ""}>
+        <span>End with a trivia trade: one random player gets a question, and if they get it right they can swap one of their picks for one of someone else's.</span></label>
     </div>`;
 }
 function readRules() {
@@ -1401,14 +1811,14 @@ function readRules() {
     budget: Math.max(1, Math.min(1000, parseInt(v("budget").value) || 20)),
     slots: Math.max(1, Math.min(10, parseInt(v("slots").value) || 5)),
     reserve: v("reserve").checked, secondChance: v("second").checked, showStats: v("showStats").checked,
-    lowest: v("lowest").checked, winBy: pressed ? pressed.dataset.winby : null,
+    lowest: v("lowest").checked, trivia: v("trivia").checked, winBy: pressed ? pressed.dataset.winby : null,
   };
 }
 function rulesSummary(su) {
   const g = GENRES.find(x => x.id === su.genreId) || GENRES[0];
   const stat = g.id === "custom" ? null : statFor(g, su.winBy);
   const win = stat ? `${su.lowest ? "lowest" : "highest"} ${stat.agg === "avg" ? "average " : ""}${lc(stat.label)} wins` : (su.lowest ? "lowest score wins" : "highest score wins");
-  return `${win} · ${money(su.budget)} each · ${su.slots} slots · ${su.reserve ? "£1 kept back per empty slot" : "no money kept back"} · stats ${su.showStats ? "shown while bidding" : "hidden until the end"}`;
+  return `${win} · ${money(su.budget)} each · ${su.slots} slots · ${su.reserve ? "£1 kept back per empty slot" : "no money kept back"} · stats ${su.showStats ? "shown while bidding" : "hidden until the end"}${su.trivia !== false ? " · trivia trade at the end" : ""}`;
 }
 
 function renderSetup() {
@@ -1802,6 +2212,8 @@ function renderEnd() {
       <h2>No stats for this list, so you decide. Who drafted best?</h2>
       ${canAct ? `<div class="actions">${ps.map((p, i) => `<button class="vote-btn" data-vote="${i}" style="--pc:var(${p.color})">${esc(p.name)}</button>`).join("")}</div>` : ""}`;
   }
+  const ts = triviaSummary();
+  if (ts) head += `<p class="note">${ts}</p>`;
   const valuePick = S.stat && !S.lowest && S.stat.agg !== "avg" ? allPicks.filter(k => k.price > 0 && k.value != null).sort((a, b) => b.value / b.price - a.value / a.price)[0] : null;
   $app.innerHTML = `
   <div class="wrap" style="gap:20px">
@@ -1862,7 +2274,7 @@ function start(data) {
     return;
   }
   const restored = (data && data.S) || load();
-  const ok = restored && ["home", "setup", "reveal", "auction", "sold", "end"].includes(restored.phase) && (restored.phase === "home" || restored.phase === "setup" || restored.players);
+  const ok = restored && ["home", "setup", "reveal", "auction", "sold", "trivia", "end"].includes(restored.phase) && (restored.phase === "home" || restored.phase === "setup" || restored.players);
   S = ok ? restored : defaultSetup();
   if (S.phase === "setup" && S.mode === "host") S.mode = "host";
   render();
