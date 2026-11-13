@@ -395,6 +395,17 @@ const GENRES = [
     ["Mr. Brightside","The Killers · 2004",3.59,223],["Toxic","Britney Spears · 2004",2.11,199],["Seven Nation Army","The White Stripes · 2003",2.33,232],
     ["Rehab","Amy Winehouse · 2006",0.74,214],["Single Ladies","Beyoncé · 2008",0.91,193],["In da Club","50 Cent · 2003",2.28,193],
     ["Since U Been Gone","Kelly Clarkson · 2004",1.21,188] ]},
+  { id: "paramore", name: "Paramore", blurb: "Emo anthems and pop-punk bangers",
+    stat: { label: "Spotify streams", fmt: "plays", source: "Spotify totals via kworb.net, 10 Nov 2026" }, items: [
+    ["Still into You","2013",1329.1],["Misery Business","2007",1248.8],["The Only Exception","2010",1011.5],["Hard Times","2017",774.3],
+    ["Ain't It Fun","2014",751.9],["All I Wanted","2009",660.4],["Decode","2008",620.3],["That's What You Get","2008",458.8],
+    ["Ignorance","2009",397.5],["crushcrushcrush","2007",368.6] ]},
+  { id: "hayley", name: "Hayley Williams solo", blurb: "Her solo songs, no features",
+    stat: { label: "Spotify streams", fmt: "plays", source: "Spotify totals via kworb.net, 9 Nov 2026" }, items: [
+    ["Parachute","Hayley Williams",50.2],["Simmer","Hayley Williams",41.1],["Dead Horse","Hayley Williams",28.0],
+    ["Ice In My OJ","Hayley Williams",25.4],["Good Ol' Days","Hayley Williams",25.3],["Kill Me","Hayley Williams",24.1],
+    ["Love Me Different","Hayley Williams",23.6],["Glum","Hayley Williams",22.7],["Crystal Clear","Hayley Williams",21.0],
+    ["Ego Death At A Bachelorette Party","Hayley Williams",20.1] ]},
   { id: "games-2010s", name: "Video games of the 2010s", blurb: "Open worlds and tight shooters",
     stats: [
       { id: "sold", label: "Copies sold", fmt: "millions", source: "Latest publisher figures; some are a few years old" },
@@ -476,6 +487,7 @@ function fmtStat(v, fmt) {
     case "age": return Math.round(v) + " yrs";
     case "length": { const t = Math.round(v); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); }
     case "one": return (+v).toFixed(1);
+    case "plays": return v >= 1000 ? (v / 1000).toFixed(2) + "bn" : (+v).toFixed(1).replace(/\.0$/, "") + "m";
     case "m1": return (+v).toFixed(1).replace(/\.0$/, "") + "m";
     default: return Math.round(v).toLocaleString("en-GB");
   }
@@ -1212,7 +1224,7 @@ function renderHome() {
 // on a phone. The open tab is only a view; it doesn't change the chosen genre.
 const GROUPS = [["movies", "Movies"], ["tv", "TV"], ["gaming", "Gaming"], ["music", "Music"], ["sport", "Sport"], ["world", "People and places"], ["food", "Food"], ["custom", "Make your own"]];
 const GROUP_OF = { tv: "tv", sitcoms: "tv", netflix: "tv", "british-tv": "tv", consoles: "gaming", switch: "gaming", "albums-2010s": "music", "songs-2000s": "music",
-  popstars: "music", consoles: "gaming", "pl-legends": "sport", "pl-clubs": "sport", celebs: "world", countries: "world", "fast-food": "food", custom: "custom" };
+  popstars: "music", paramore: "music", hayley: "music", consoles: "gaming", "pl-legends": "sport", "pl-clubs": "sport", celebs: "world", countries: "world", "fast-food": "food", custom: "custom" };
 const groupOf = g => g.group || GROUP_OF[g.id] || (/^games/.test(g.id) ? "gaming" : "movies");
 let genreTab = null;
 function genreGrid(selected, includeCustom) {
