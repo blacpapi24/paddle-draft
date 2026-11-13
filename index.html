@@ -189,6 +189,10 @@ textarea { min-height: 140px; resize: vertical; }
 .board.champ { box-shadow: 0 0 0 2px var(--pc), var(--shadow); }
 .crown { display: inline-block; vertical-align: middle; font-family: var(--f-body); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: 2px 8px; border-radius: 999px; background: var(--pc); color: #fff; }
 .genre .wins { color: var(--ink); font-weight: 500; }
+.winby { display: flex; flex-wrap: wrap; gap: 8px; }
+.winby button { border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 14px; cursor: pointer; min-height: 40px; }
+.winby button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.rules-box { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 12px; }
 .lot-stat { margin-top: 10px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .lot-stat b { font-size: 15px; }
 .vote-btn { border: 0; border-radius: 12px; padding: 12px 20px; background: var(--pc); color: #fff; font-family: var(--f-display); font-weight: 700; font-size: 16px; }
@@ -301,38 +305,89 @@ const GENRES = [
     ["The Dark Knight","2008",1008],["The Return of the King","2003",1149],["Spirited Away","2001",359],["Gladiator","2000",465],
     ["No Country for Old Men","2007",172],["There Will Be Blood","2007",76],["The Departed","2006",291],
     ["Finding Nemo","2003",942],["Inglourious Basterds","2009",321],["City of God","2002",31] ]},
+  { id: "celebs", name: "Celebrities", blurb: "The most followed people on Instagram",
+    stats: [
+      { id: "followers", label: "Instagram followers", fmt: "followers", source: "Instagram follower counts via Wikipedia, mid 2026" },
+      { id: "age", label: "Age", fmt: "age", agg: "avg", dob: true, source: "Ages worked out from dates of birth" } ],
+    items: [
+    ["Cristiano Ronaldo","Footballer",678,"1985-02-05"],["Lionel Messi","Footballer",515,"1987-06-24"],
+    ["Selena Gomez","Singer and actor",404,"1992-07-22"],["Dwayne Johnson","Actor",382,"1972-05-02"],
+    ["Kylie Jenner","Businesswoman",382,"1997-08-10"],["Ariana Grande","Singer",363,"1993-06-26"],
+    ["Kim Kardashian","TV and business",344,"1980-10-21"],["Beyoncé","Singer",300,"1981-09-04"],
+    ["Khloé Kardashian","TV personality",292,"1984-06-27"],["Justin Bieber","Singer",286,"1994-03-01"] ]},
+  { id: "popstars", name: "Pop stars", blurb: "Chart royalty of the last twenty years",
+    stats: [
+      { id: "grammys", label: "Grammys won", fmt: "int", source: "Grammy wins to the 2026 ceremony" },
+      { id: "age", label: "Age", fmt: "age", agg: "avg", dob: true, source: "Ages worked out from dates of birth" } ],
+    items: [
+    ["Beyoncé","Houston",35,"1981-09-04"],["Taylor Swift","Pennsylvania",14,"1989-12-13"],["Rihanna","Barbados",9,"1988-02-20"],
+    ["Drake","Toronto",5,"1986-10-24"],["Ariana Grande","Florida",3,"1993-06-26"],["Bruno Mars","Hawaii",16,"1985-10-08"],
+    ["The Weeknd","Toronto",4,"1990-02-16"],["Adele","London",16,"1988-05-05"],["Billie Eilish","Los Angeles",10,"2001-12-18"],
+    ["Ed Sheeran","Halifax",4,"1991-02-17"] ]},
   { id: "tv", name: "TV shows", blurb: "Prestige drama and great comedy",
     stat: { label: "IMDb rating", fmt: "rating", source: "IMDb user ratings, approximate" }, items: [
     ["Breaking Bad","2008–2013",9.5],["The Sopranos","1999–2007",9.2],["The Wire","2002–2008",9.3],
     ["Game of Thrones","2011–2019",9.2],["Succession","2018–2023",8.8],["Fleabag","2016–2019",8.7],
     ["Better Call Saul","2015–2022",9.0],["The Bear","2022–",8.5],["Stranger Things","2016–2025",8.6],["The Office (US)","2005–2013",9.0] ]},
   { id: "albums-2010s", name: "Albums of the 2010s", blurb: "Records that defined the decade",
-    stat: { label: "Metacritic critics' score", fmt: "int", source: "Metacritic Metascores" }, items: [
-    ["To Pimp a Butterfly","Kendrick Lamar · 2015",96],["Blonde","Frank Ocean · 2016",87],["Lemonade","Beyoncé · 2016",92],
-    ["My Beautiful Dark Twisted Fantasy","Kanye West · 2010",94],["21","Adele · 2011",76],
-    ["good kid, m.A.A.d city","Kendrick Lamar · 2012",91],["channel ORANGE","Frank Ocean · 2012",91],
-    ["AM","Arctic Monkeys · 2013",81],["Random Access Memories","Daft Punk · 2013",87],["Currents","Tame Impala · 2015",84] ]},
+    stats: [
+      { id: "meta", label: "Metacritic critics' score", fmt: "int", source: "Metacritic Metascores" },
+      { id: "length", label: "Running time", fmt: "length", source: "Standard edition running times" } ],
+    items: [
+    ["To Pimp a Butterfly","Kendrick Lamar · 2015",96,4731],["Blonde","Frank Ocean · 2016",87,3608],["Lemonade","Beyoncé · 2016",92,2745],
+    ["My Beautiful Dark Twisted Fantasy","Kanye West · 2010",94,4114],["21","Adele · 2011",76,2881],
+    ["good kid, m.A.A.d city","Kendrick Lamar · 2012",91,4102],["channel ORANGE","Frank Ocean · 2012",91,3349],
+    ["AM","Arctic Monkeys · 2013",81,2498],["Random Access Memories","Daft Punk · 2013",87,4479],["Currents","Tame Impala · 2015",84,3072] ]},
   { id: "songs-2000s", name: "Pop songs of the 2000s", blurb: "Indie discos and R&B anthems",
-    stat: { label: "Spotify streams", fmt: "streams", source: "Spotify totals via kworb.net, Nov 2026" }, items: [
-    ["Crazy in Love","Beyoncé · 2003",2.02],["Hey Ya!","OutKast · 2003",2.02],["Umbrella","Rihanna · 2007",2.48],
-    ["Mr. Brightside","The Killers · 2004",3.59],["Toxic","Britney Spears · 2004",2.11],["Seven Nation Army","The White Stripes · 2003",2.33],
-    ["Rehab","Amy Winehouse · 2006",0.74],["Single Ladies","Beyoncé · 2008",0.91],["In da Club","50 Cent · 2003",2.28],
-    ["Since U Been Gone","Kelly Clarkson · 2004",1.21] ]},
+    stats: [
+      { id: "streams", label: "Spotify streams", fmt: "streams", source: "Spotify totals via kworb.net, Nov 2026" },
+      { id: "length", label: "Song length", fmt: "length", source: "Single and album track lengths" } ],
+    items: [
+    ["Crazy in Love","Beyoncé · 2003",2.02,236],["Hey Ya!","OutKast · 2003",2.02,235],["Umbrella","Rihanna · 2007",2.48,276],
+    ["Mr. Brightside","The Killers · 2004",3.59,223],["Toxic","Britney Spears · 2004",2.11,199],["Seven Nation Army","The White Stripes · 2003",2.33,232],
+    ["Rehab","Amy Winehouse · 2006",0.74,214],["Single Ladies","Beyoncé · 2008",0.91,193],["In da Club","50 Cent · 2003",2.28,193],
+    ["Since U Been Gone","Kelly Clarkson · 2004",1.21,188] ]},
   { id: "games-2010s", name: "Video games of the 2010s", blurb: "Open worlds and tight shooters",
-    stat: { label: "Copies sold", fmt: "millions", source: "Latest publisher figures; some are a few years old" }, items: [
-    ["Red Dead Redemption 2","2018",87],["The Witcher 3","2015",65],["Breath of the Wild","2017",36],["Skyrim","2011",65],
-    ["Minecraft","2011",425],["Grand Theft Auto V","2013",215],["Mario Kart 8 Deluxe","2017",72],["Portal 2","2011",4],
-    ["God of War","2018",23],["Super Smash Bros. Ultimate","2018",38] ]},
+    stats: [
+      { id: "sold", label: "Copies sold", fmt: "millions", source: "Latest publisher figures; some are a few years old" },
+      { id: "meta", label: "Metacritic score", fmt: "int", source: "Metacritic Metascores for the original platform" } ],
+    items: [
+    ["Red Dead Redemption 2","2018",87,97],["The Witcher 3","2015",65,93],["Breath of the Wild","2017",36,97],["Skyrim","2011",65,94],
+    ["Minecraft","2011",425,93],["Grand Theft Auto V","2013",215,97],["Mario Kart 8 Deluxe","2017",72,92],["Portal 2","2011",4,95],
+    ["God of War","2018",23,94],["Super Smash Bros. Ultimate","2018",38,93] ]},
+  { id: "countries", name: "Biggest countries", blurb: "The ten most populous nations",
+    stats: [
+      { id: "pop", label: "Population", fmt: "pop", source: "UN and national estimates, 2025-26" },
+      { id: "area", label: "Land area", fmt: "area", source: "Total area, UN figures" },
+      { id: "golds", label: "Summer Olympic golds", fmt: "int", source: "All-time Summer Games golds to Paris 2024 (Russia excludes Soviet era)" } ],
+    items: [
+    ["India","Asia",1429.4,3287263,10],["China","Asia",1404.9,9596960,303],["United States","North America",341.8,9525067,1106],
+    ["Indonesia","Asia",288.3,1904569,10],["Pakistan","Asia",241.5,882363,4],["Nigeria","Africa",223.8,923768,3],
+    ["Brazil","South America",214.2,8510346,40],["Bangladesh","Asia",169.8,148460,0],["Russia","Europe and Asia",146.0,17098246,147],
+    ["Mexico","North America",131.2,1964375,13] ]},
   { id: "pl-legends", name: "Premier League legends", blurb: "The best of the PL era",
     stat: { label: "Premier League goals", fmt: "int", source: "PL career goals to the end of 2025-26" }, items: [
     ["Thierry Henry","Arsenal",175],["Alan Shearer","Blackburn · Newcastle",260],["Cristiano Ronaldo","Man United",103],
     ["Wayne Rooney","Everton · Man United",208],["Steven Gerrard","Liverpool",120],["Frank Lampard","West Ham · Chelsea",177],
     ["Kevin De Bruyne","Man City",72],["Mohamed Salah","Chelsea · Liverpool",193],["Didier Drogba","Chelsea",104],["Ryan Giggs","Man United",109] ]},
+  { id: "pl-clubs", name: "Football clubs", blurb: "England's biggest clubs",
+    stats: [
+      { id: "titles", label: "League titles", fmt: "int", source: "English top-flight titles to the end of 2025-26" },
+      { id: "facups", label: "FA Cups", fmt: "int", source: "FA Cup wins to the end of 2025-26" },
+      { id: "capacity", label: "Stadium capacity", fmt: "int", source: "Club-stated capacities, 2026 (City and Newcastle approximate)" } ],
+    items: [
+    ["Manchester United","Old Trafford",20,13,74158],["Liverpool","Anfield",20,8,61276],["Arsenal","Emirates Stadium",14,14,60704],
+    ["Manchester City","Etihad Stadium",10,8,61000],["Everton","Hill Dickinson Stadium",9,5,52769],["Aston Villa","Villa Park",7,7,43205],
+    ["Chelsea","Stamford Bridge",6,8,40044],["Newcastle United","St James' Park",4,6,52258],["Tottenham Hotspur","Tottenham Hotspur Stadium",2,8,62850],
+    ["West Ham United","London Stadium",0,3,62500] ]},
   { id: "fast-food", name: "Fast food chains", blurb: "The great British takeaway",
-    stat: { label: "UK restaurants", fmt: "int", source: "UK store counts, Nov 2026" }, items: [
-    ["McDonald's","Burgers",1530],["KFC","Fried chicken",1010],["Nando's","Peri-peri",490],["Greggs","Bakery",2820],
-    ["Five Guys","Burgers",180],["Domino's","Pizza",1330],["Burger King","Burgers",560],["Subway","Subs",2080],
-    ["Wingstop","Wings",110],["Taco Bell","Tex-Mex",150] ]},
+    stats: [
+      { id: "stores", label: "UK restaurants", fmt: "int", source: "UK store counts, Nov 2026" },
+      { id: "founded", label: "Year founded", fmt: "year", agg: "avg", source: "Year the first restaurant opened" } ],
+    items: [
+    ["McDonald's","Burgers",1530,1940],["KFC","Fried chicken",1010,1952],["Nando's","Peri-peri",490,1987],["Greggs","Bakery",2820,1939],
+    ["Five Guys","Burgers",180,1986],["Domino's","Pizza",1330,1960],["Burger King","Burgers",560,1953],["Subway","Subs",2080,1965],
+    ["Wingstop","Wings",110,1994],["Taco Bell","Tex-Mex",150,1962] ]},
   { id: "custom", name: "Make your own", blurb: "Type in any list you like", stat: null, items: [] },
 ];
 function fmtStat(v, fmt) {
@@ -342,10 +397,43 @@ function fmtStat(v, fmt) {
     case "rating": return (+v).toFixed(1);
     case "streams": return (+v).toFixed(2) + "bn";
     case "millions": return Math.round(v) + "m";
+    case "year": return String(Math.round(v));
+    case "mins": return Math.round(v) + " min";
+    case "followers": return (v >= 1000 ? (v / 1000).toFixed(2) + "bn" : Math.round(v) + "m");
+    case "pop": return v >= 1000 ? (v / 1000).toFixed(2) + "bn" : Math.round(v) + "m";
+    case "area": return v >= 1e6 ? (v / 1e6).toFixed(2) + "m km²" : Math.round(v / 1000) + "k km²";
+    case "age": return Math.round(v) + " yrs";
+    case "length": { const t = Math.round(v); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); }
+    case "one": return (+v).toFixed(1);
     default: return Math.round(v).toLocaleString("en-GB");
   }
 }
 const PCOLORS = ["--p1","--p2","--p3","--p4","--p5","--p6"];
+
+// Each genre can be won on several stats. Normalise every genre to
+// g.stats = [{ id, label, fmt, source, agg }] and items = [title, sub, { statId: value }].
+// agg "avg" scores the average of your picks (years, ratings); otherwise the total.
+GENRES.forEach(g => {
+  if (!g.stats) g.stats = g.stat ? [{ id: "main", ...g.stat }] : [];
+  // Items list values in the same order as g.stats: [title, sub, v1, v2, ...].
+  // A stat marked dob holds a date of birth and becomes today's age.
+  const now = new Date();
+  const ageOf = d => { const b = new Date(d + "T00:00:00"); let a = now.getFullYear() - b.getFullYear();
+    if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) a--; return a; };
+  g.items = g.items.map(it => {
+    const vals = {};
+    g.stats.forEach((st, i) => { const v = it[2 + i]; if (v != null) vals[st.id] = st.dob ? ageOf(v) : v; });
+    return [it[0], it[1], vals];
+  });
+  const years = g.items.map(it => { const m = /\b(19|20)\d{2}\b/.exec(it[1]); return m ? +m[0] : null; });
+  if (g.items.length && years.every(y => y) && !g.stats.some(st => st.id === "year")) {
+    g.stats.push({ id: "year", label: "Release year", fmt: "year", agg: "avg", source: "Release years" });
+    g.items.forEach((it, i) => { it[2].year = years[i]; });
+  }
+});
+// Lower-case a label for mid-sentence use, leaving names like IMDb, UK and FA alone.
+const lc = t => t.split(" ").map((w, i, a) => /^[A-Z][a-z]/.test(w) && !/^(Instagram|Spotify|Metacritic|Grammy|Summer|Olympic|Premier|Cup|Cups)$/.test(w) && a[i - 1] !== "Premier" ? w.toLowerCase() : w).join(" ");
+const statFor = (g, id) => g.stats.find(st => st.id === id) || g.stats[0] || null;
 
 /* ---------------- state ---------------- */
 // Local games keep their state in this browser. Online games keep it in one
@@ -693,7 +781,7 @@ let dbAvailable = null; // null = still checking
 
 function defaultSetup() {
   return { phase: "home", mode: "local", names: ["Player 1", "Player 2"], myName: "", genreId: "films-2020s", custom: "",
-    customName: "", customStat: "", budget: 20, slots: 5, reserve: true, secondChance: true, showStats: false };
+    customName: "", customStat: "", budget: 20, slots: 5, reserve: true, secondChance: true, showStats: false, winBy: null, lowest: false };
 }
 function save() { if (NET) return; try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
 function load() { try { const r = localStorage.getItem(STORE_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
@@ -733,15 +821,16 @@ function startGame(setup) {
     genreName = (setup.customName || "").trim() || "Custom list";
     stat = items.some(it => it.value != null) ? { label: (setup.customStat || "").trim() || "Score", fmt: "num" } : null;
   } else {
-    items = g.items.map(([title, sub, value]) => ({ title, sub, value }));
+    stat = statFor(g, setup.winBy);
+    items = g.items.map(([title, sub, vals]) => ({ title, sub, value: stat ? vals[stat.id] : null }));
     genreName = g.name;
-    stat = g.stat;
   }
   const roster = NET ? S.members.map(m => ({ id: m.id, name: m.name })) : setup.names.map(n => ({ id: null, name: n }));
   const keep = NET ? { code: S.code, host: S.host, members: S.members } : {};
   S = {
     ...keep,
-    phase: "reveal", setup, stat, showStats: setup.showStats,
+    phase: "reveal", setup, stat, showStats: setup.showStats, lowest: !!setup.lowest,
+    worst: stat ? Math.max(...items.map(it => it.value || 0)) : 0,
     genre: genreName, budget: setup.budget, slots: setup.slots, reserve: setup.reserve, secondChance: setup.secondChance,
     players: roster.map((r, i) => ({ id: r.id, name: (r.name || "").trim() || `Player ${i + 1}`, color: PCOLORS[i], budget: setup.budget, picks: [] })),
     queue: shuffle(items).map(it => ({ ...it, passes: 0 })),
@@ -1053,9 +1142,57 @@ function genreGrid(selected, includeCustom) {
       <button class="genre" data-genre="${x.id}" aria-pressed="${x.id === selected}">
         <strong>${esc(x.name)}</strong>
         <span>${esc(x.blurb)}</span>
-        <span class="wins">${x.stat ? `Winner: most ${esc(x.stat.label.toLowerCase())}` : "Winner: your own numbers, or a vote"}</span>
+        <span class="wins">${x.stats.length ? `Win on: ${esc(x.stats.map(st => lc(st.label)).join(", "))}` : "Winner: your own numbers, or a vote"}</span>
       </button>`).join("")}
   </div>`;
+}
+
+// "How to win" plus the house rules. Used in setup and, for the host, in the lobby
+// and between rounds, so the rules can change without starting over.
+function rulesHTML(su) {
+  const g = GENRES.find(x => x.id === su.genreId) || GENRES[0];
+  const stat = g.id === "custom" ? null : statFor(g, su.winBy);
+  return `
+    <div class="field-row">
+      <h2>How to win</h2>
+      ${g.id !== "custom" ? `<div class="winby" role="group" aria-label="Stat that decides the winner">
+        ${g.stats.map(st => `<button type="button" data-winby="${st.id}" aria-pressed="${stat && st.id === stat.id}">${esc(st.label)}</button>`).join("")}
+      </div>` : ""}
+      <label class="check"><input type="checkbox" id="lowest" ${su.lowest ? "checked" : ""}>
+        <span>Lowest total wins instead. Empty slots count as the highest value in the list, so skipping picks never helps.</span></label>
+      ${stat && stat.agg === "avg" ? `<p class="note">${esc(stat.label)} is scored as the average of your picks.</p>` : ""}
+    </div>
+    <div class="field-row">
+      <h2>House rules</h2>
+      <div class="rules-grid">
+        <label class="rule"><span class="label">Budget each</span>
+          <input type="number" id="budget" min="5" max="1000" value="${su.budget}"></label>
+        <label class="rule"><span class="label">Draft slots each</span>
+          <input type="number" id="slots" min="1" max="10" value="${su.slots}"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="reserve" ${su.reserve ? "checked" : ""}>
+        <span>Keep £1 back for every empty slot, so nobody can blow their whole budget on one pick.</span></label>
+      <label class="check"><input type="checkbox" id="second" ${su.secondChance ? "checked" : ""}>
+        <span>If nobody bids on a lot, it goes to the back of the pile for one more go.</span></label>
+      <label class="check"><input type="checkbox" id="showStats" ${su.showStats ? "checked" : ""}>
+        <span>Show each lot's stat while bidding. Leave this off to keep the numbers secret until the final reveal.</span></label>
+    </div>`;
+}
+function readRules() {
+  const v = id => document.getElementById(id);
+  const pressed = document.querySelector("[data-winby][aria-pressed=true]");
+  return {
+    budget: Math.max(1, Math.min(1000, parseInt(v("budget").value) || 20)),
+    slots: Math.max(1, Math.min(10, parseInt(v("slots").value) || 5)),
+    reserve: v("reserve").checked, secondChance: v("second").checked, showStats: v("showStats").checked,
+    lowest: v("lowest").checked, winBy: pressed ? pressed.dataset.winby : null,
+  };
+}
+function rulesSummary(su) {
+  const g = GENRES.find(x => x.id === su.genreId) || GENRES[0];
+  const stat = g.id === "custom" ? null : statFor(g, su.winBy);
+  const win = stat ? `${su.lowest ? "lowest" : "highest"} ${stat.agg === "avg" ? "average " : ""}${lc(stat.label)} wins` : (su.lowest ? "lowest score wins" : "highest score wins");
+  return `${win} · ${money(su.budget)} each · ${su.slots} slots · ${su.reserve ? "£1 kept back per empty slot" : "no money kept back"} · stats ${su.showStats ? "shown while bidding" : "hidden until the end"}`;
 }
 
 function renderSetup() {
@@ -1096,28 +1233,14 @@ function renderSetup() {
         </div>` : ""}
     </div>
 
-    <div class="field-row">
-      <h2>House rules</h2>
-      <div class="rules-grid">
-        <label class="rule"><span class="label">Budget each</span>
-          <input type="number" id="budget" min="5" max="1000" value="${st.budget}"></label>
-        <label class="rule"><span class="label">Draft slots each</span>
-          <input type="number" id="slots" min="1" max="10" value="${st.slots}"></label>
-      </div>
-      <label class="check"><input type="checkbox" id="reserve" ${st.reserve ? "checked" : ""}>
-        <span>Keep £1 back for every empty slot, so nobody can blow their whole budget on one pick.</span></label>
-      <label class="check"><input type="checkbox" id="second" ${st.secondChance ? "checked" : ""}>
-        <span>If nobody bids on a lot, it goes to the back of the pile for one more go.</span></label>
-      <label class="check"><input type="checkbox" id="showStats" ${st.showStats ? "checked" : ""}>
-        <span>Show each lot's stat while bidding. Leave this off to keep the numbers secret until the final reveal.</span></label>
-    </div>
+    ${rulesHTML(st)}
 
     <ol class="howto">
       <li>Lots come up one at a time in a random order.</li>
       <li>${host ? "Each player bids from their own phone." : "Pass the device round."} On your turn, raise the price or drop out.</li>
       <li>When everyone else has dropped out, the last bidder wins the lot into a slot.</li>
       <li>The draft ends when the lots run out or every slot is full.</li>
-      <li>The biggest combined total for the genre's stat wins. On a tie, whoever has more money left wins.</li>
+      <li>The best combined total for the stat you chose wins. On a tie, whoever has more money left wins.</li>
     </ol>
     <p class="error" id="err"></p>
     <div><button class="primary" id="startBtn">${host ? "Create the room" : "Open the auction"}</button></div>
@@ -1126,19 +1249,16 @@ function renderSetup() {
   const readForm = () => {
     if (host) st.myName = document.getElementById("myName").value;
     else st.names = st.names.map((_, i) => document.getElementById("pname-" + i).value);
-    st.budget = Math.max(1, Math.min(1000, parseInt(document.getElementById("budget").value) || 20));
-    st.slots = Math.max(1, Math.min(10, parseInt(document.getElementById("slots").value) || 5));
-    st.reserve = document.getElementById("reserve").checked;
-    st.secondChance = document.getElementById("second").checked;
+    Object.assign(st, readRules());
     const cl = document.getElementById("customList"); if (cl) st.custom = cl.value;
     const cn = document.getElementById("customName"); if (cn) st.customName = cn.value;
     const cs = document.getElementById("customStat"); if (cs) st.customStat = cs.value;
-    st.showStats = document.getElementById("showStats").checked;
     save();
   };
   $app.querySelectorAll("input,textarea").forEach(el => el.addEventListener("change", readForm));
   document.getElementById("backHome").onclick = () => { readForm(); st.phase = "home"; save(); render(); };
-  $app.querySelectorAll("[data-genre]").forEach(b => b.onclick = () => { readForm(); st.genreId = b.dataset.genre; save(); render(); });
+  $app.querySelectorAll("[data-genre]").forEach(b => b.onclick = () => { readForm(); if (st.genreId !== b.dataset.genre) st.winBy = null; st.genreId = b.dataset.genre; save(); render(); });
+  $app.querySelectorAll("[data-winby]").forEach(b => b.onclick = () => { readForm(); st.winBy = b.dataset.winby; save(); render(); });
   $app.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { readForm(); st.names.splice(+b.dataset.rm, 1); save(); render(); });
   const add = document.getElementById("addPlayer");
   if (add) add.onclick = () => { readForm(); st.names.push(`Player ${st.names.length + 1}`); save(); render();
@@ -1217,8 +1337,9 @@ function renderLobby() {
     <div class="field-row">
       <span class="label">Genre</span>
       ${amHost ? genreGrid(su.genreId, su.genreId === "custom") : `<b class="lobby-genre">${esc(genreName)}</b>`}
-      <p class="note">${money(su.budget)} each · ${su.slots} slots · ${su.reserve ? "£1 kept back per empty slot" : "no money kept back"} · stats ${su.showStats ? "shown while bidding" : "hidden until the end"}</p>
+      ${amHost ? "" : `<p class="note">${esc(rulesSummary(su))}</p>`}
     </div>
+    ${amHost ? `<div class="rules-box">${rulesHTML(su)}<p class="error" id="rulesErr"></p></div>` : ""}
     ${!member ? `<p class="note">You're watching this room. Go back and join with the code to play.</p>` : ""}
     <div class="actions">
       ${amHost ? `<button class="primary" id="startOnline" ${S.members.length < 2 ? "disabled" : ""}>${S.members.length < 2 ? "Waiting for players to join" : "Start the draft"}</button>`
@@ -1234,19 +1355,43 @@ function renderLobby() {
   if (amHost) {
     $app.querySelectorAll("[data-genre]").forEach(b => b.onclick = () => {
       const id = b.dataset.genre;
-      act(() => { if (S.phase !== "lobby") return false; S.setup.genreId = id; });
+      act(() => { if (S.phase !== "lobby") return false; if (S.setup.genreId !== id) S.setup.winBy = null; S.setup.genreId = id; });
     });
+    const pushRules = extra => {
+      const vals = Object.assign(readRules(), extra || {});
+      act(() => { if (S.phase !== "lobby") return false; Object.assign(S.setup, vals); });
+    };
+    $app.querySelectorAll(".rules-box input").forEach(el => el.addEventListener("change", () => pushRules()));
+    $app.querySelectorAll("[data-winby]").forEach(b => b.onclick = () => pushRules({ winBy: b.dataset.winby }));
     const sb = document.getElementById("startOnline");
-    if (sb) sb.onclick = () => act(() => { if (S.phase !== "lobby" || S.members.length < 2) return false; startGame(S.setup); });
+    if (sb) sb.onclick = () => {
+      const su2 = Object.assign({}, S.setup, readRules());
+      if (su2.reserve && su2.budget < su2.slots) { document.getElementById("rulesErr").textContent = `With the £1-per-slot rule, the budget needs to be at least £${su2.slots}.`; return; }
+      act(() => { if (S.phase !== "lobby" || S.members.length < 2) return false; Object.assign(S.setup, readRules()); startGame(S.setup); });
+    };
   }
 }
 
-const total = p => p.picks.reduce((s, k) => s + (k.value || 0), 0);
-function standings() {
-  // highest total wins; a tie goes to whoever has more money left
-  return S.players.map((p, i) => ({ i, total: total(p), left: p.budget }))
-    .sort((a, b) => b.total - a.total || b.left - a.left);
+// A player's score for the chosen stat. With "lowest wins", an empty slot
+// counts as the highest value in the list, so skipping picks never helps.
+function total(p) {
+  const vals = p.picks.map(k => k.value || 0);
+  const avg = S.stat && S.stat.agg === "avg";
+  if (S.lowest) {
+    const filled = vals.concat(Array(Math.max(0, S.slots - vals.length)).fill(S.worst || 0));
+    return avg ? filled.reduce((a, b) => a + b, 0) / filled.length : filled.reduce((a, b) => a + b, 0);
+  }
+  if (avg) return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  return vals.reduce((a, b) => a + b, 0);
 }
+function standings() {
+  // best score wins; a tie goes to whoever has more money left
+  const dir = S.lowest ? 1 : -1;
+  return S.players.map((p, i) => ({ i, total: total(p), left: p.budget }))
+    .sort((a, b) => dir * (a.total - b.total) || b.left - a.left);
+}
+const scoreLabel = () => S.stat ? (S.stat.agg === "avg" ? "Average " + lc(S.stat.label) : S.stat.label) : "";
+const fmtScore = v => S.stat && S.stat.agg === "avg" && S.stat.fmt !== "year" ? (+v).toFixed(1) : fmtStat(v, S.stat.fmt === "year" && S.stat.agg === "avg" ? "one" : S.stat.fmt);
 function boardsHTML(final, ranking) {
   const showVals = S.stat && (final || S.showStats);
   const seat = mySeat();
@@ -1264,7 +1409,7 @@ function boardsHTML(final, ranking) {
                       : `<li class="slot empty"><span class="t">Empty slot</span><span></span></li>`;
           }).join("")}
         </ol>
-        ${showVals ? `<div class="board-total"><span class="label">${esc(S.stat.label)}</span><b class="mono">${fmtStat(total(p), S.stat.fmt)}</b></div>` : ""}
+        ${showVals ? `<div class="board-total"><span class="label">${esc(scoreLabel())}</span><b class="mono">${fmtScore(total(p))}</b></div>` : ""}
         <div class="board-foot"><span>${final ? `Spent ${money(S.budget - p.budget)}` : empty(p) ? `Max bid now ${money(Math.max(0, maxBid(p)))}` : "Draft complete"}</span>${leading ? `<span>Leading</span>` : ""}${place > 0 ? `<span>${ordinal(place + 1)} place</span>` : ""}</div>
       </article>`;
     }).join("")}
@@ -1419,11 +1564,11 @@ function renderEnd() {
     const w = ranking[0], second = ranking[1];
     const tie = second && second.total === w.total;
     const wp = ps[w.i];
-    head = `<span class="label">${esc(S.genre)} · most ${esc(S.stat.label.toLowerCase())} wins</span>
-      <h2>${esc(wp.name)} wins with ${fmtStat(w.total, S.stat.fmt)}</h2>
+    head = `<span class="label">${esc(S.genre)} · ${S.lowest ? "lowest" : "highest"} ${esc(lc(scoreLabel()))} wins</span>
+      <h2>${esc(wp.name)} wins with ${fmtScore(w.total)}</h2>
       <p class="note">${second ? (tie
-        ? `Level with ${esc(ps[second.i].name)} on ${fmtStat(second.total, S.stat.fmt)}, so it goes to money left: ${money(w.left)} to ${money(second.left)}.`
-        : `${esc(ps[second.i].name)} finished on ${fmtStat(second.total, S.stat.fmt)}.`) : ""}</p>
+        ? `Level with ${esc(ps[second.i].name)} on ${fmtScore(second.total)}, so it goes to money left: ${money(w.left)} to ${money(second.left)}.`
+        : `${esc(ps[second.i].name)} finished on ${fmtScore(second.total)}.`) : ""}</p>
       ${S.stat.source ? `<p class="source">Source: ${esc(S.stat.source)}</p>` : ""}`;
   } else if (S.vote != null) {
     ranking = [{ i: S.vote }];
@@ -1435,7 +1580,7 @@ function renderEnd() {
       <h2>No stats for this list, so you decide. Who drafted best?</h2>
       ${canAct ? `<div class="actions">${ps.map((p, i) => `<button class="vote-btn" data-vote="${i}" style="--pc:var(${p.color})">${esc(p.name)}</button>`).join("")}</div>` : ""}`;
   }
-  const valuePick = S.stat ? allPicks.filter(k => k.price > 0 && k.value != null).sort((a, b) => b.value / b.price - a.value / a.price)[0] : null;
+  const valuePick = S.stat && !S.lowest && S.stat.agg !== "avg" ? allPicks.filter(k => k.price > 0 && k.value != null).sort((a, b) => b.value / b.price - a.value / a.price)[0] : null;
   $app.innerHTML = `
   <div class="wrap" style="gap:20px">
     <section class="panel" style="display:grid;gap:18px">
@@ -1449,8 +1594,8 @@ function renderEnd() {
         ${unsoldUnique.length ? `<div class="award"><span>Nobody wanted</span><b>${unsoldUnique.map(esc).join(", ")}</b><span>Left unsold</span></div>` : ""}
       </div>
       ${canAct ? `<div class="actions">
-        <button class="primary" id="againBtn">Rematch, same genre</button>
-        <button class="ghost" id="newBtn" style="padding:14px 18px">${NET ? "Back to the lobby" : "Change genre or players"}</button>
+        <button class="primary" id="againBtn">Rematch, same rules</button>
+        <button class="ghost" id="newBtn" style="padding:14px 18px">${NET ? "Change settings" : "Change settings or players"}</button>
       </div>` : ""}
     </section>
     ${boardsHTML(true, ranking)}
